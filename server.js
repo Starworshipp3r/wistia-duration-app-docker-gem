@@ -49,16 +49,21 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // Wait for the specific container for each video to appear on the page.
-        await page.waitForSelector('div.MediaContainer-iGTxDE', { timeout: 30000 });
+        // Wait for a core element to appear, like the title container.
+        await page.waitForSelector('div.TitleAndDescriptionContainer-wZVJS', { timeout: 30000 });
 
-        // **MODIFIED**: This function now returns an object with both seconds and video count.
+        // **MODIFIED**: This function now also scrapes the course title.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
+            // **NEW**: Scrape the course title.
+            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
+            const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
+
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
+                courseTitle: courseTitle // Add title to the result object
             };
 
             const parseTime = (timeStr) => {
@@ -71,7 +76,8 @@ app.get('/api/get-duration', async (req, res) => {
 
             const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
             if (videoItems.length === 0) {
-                return null;
+                // Return just the title if no videos are found yet.
+                return result;
             }
 
             videoItems.forEach(item => {
@@ -88,7 +94,7 @@ app.get('/api/get-duration', async (req, res) => {
                     const timeEl = item.querySelector('time');
                     if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
-                        result.videoCount++; // Increment the counter
+                        result.videoCount++;
                     }
                 }
             });
@@ -96,12 +102,12 @@ app.get('/api/get-duration', async (req, res) => {
             return result;
         });
 
-        if (calculationData === null) {
+        if (calculationData === null || calculationData.videoCount === 0) {
+            // Check for both null and zero videos to ensure we have content.
             throw new Error('Could not find any video items on the page with the expected structure.');
         }
 
         // --- Success Response ---
-        // **MODIFIED**: Send the whole object back to the client.
         res.json(calculationData);
 
     } catch (error) {
