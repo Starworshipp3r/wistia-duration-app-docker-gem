@@ -33,7 +33,6 @@ app.get('/api/get-duration', async (req, res) => {
     let browser = null;
     try {
         // --- Puppeteer Logic ---
-        // Launch a headless browser. The 'args' are important for running in a Docker container on Render.
         browser = await puppeteer.launch({
             headless: true,
             args: [
@@ -43,36 +42,43 @@ app.get('/api/get-duration', async (req, res) => {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // This is for Docker environments
+                '--single-process',
                 '--disable-gpu'
             ],
         });
 
         const page = await browser.newPage();
         
-        // Navigate to the Wistia page and wait for the network to be idle,
-        // which indicates that dynamic content has likely finished loading.
-        await page.goto(wistiaUrl, { waitUntil: 'networkidle2' });
+        // **IMPROVEMENT 1**: Set a realistic User-Agent to mimic a real browser.
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-        // Execute code within the context of the page to find the embedded video data.
+        await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
+        
+        // **IMPROVEMENT 2**: Wait specifically for the script tag that contains the data to appear.
+        // This is more reliable than waiting for the network to be idle.
+        // We look for any script tag whose inner HTML contains the key variable name.
+        await page.waitForFunction(
+          'Array.from(document.querySelectorAll("script")).some(s => s.textContent.includes("window.folderPage.folder"))',
+          { timeout: 30000 } // Wait for up to 30 seconds.
+        );
+
+        // Now that we know the script exists, execute the evaluation logic.
         const projectData = await page.evaluate(() => {
-            // This code runs in the browser context, after all JS has loaded.
-            // It finds the same script tag we were looking for before.
             const scripts = Array.from(document.querySelectorAll('script'));
             for (const script of scripts) {
                 if (script.textContent.includes('window.folderPage.folder =')) {
                     const match = script.textContent.match(/window\.folderPage\.folder = (\{.*\});/s);
                     if (match && match[1]) {
-                        // The matched string is returned to our Node.js server.
                         return JSON.parse(match[1]);
                     }
                 }
             }
-            return null; // Return null if data is not found
+            return null;
         });
 
         if (!projectData || !projectData.medias) {
-            throw new Error('Could not find video data on the page. The structure might have changed.');
+            // This error should be less likely now, but we keep it as a fallback.
+            throw new Error('Could not find video data on the page after waiting. The page structure might have changed.');
         }
 
         // --- Calculation Logic ---
@@ -89,9 +95,15 @@ app.get('/api/get-duration', async (req, res) => {
 
     } catch (error) {
         console.error('Scraping failed:', error);
-        res.status(500).json({ error: 'Failed to fetch or process Wistia page data.' });
+        // Provide a more specific error message to the frontend.
+        let errorMessage = 'Failed to process Wistia page data.';
+        if (error.message.includes('timeout')) {
+            errorMessage = 'The page took too long to load and timed out. This could be a network issue or the page is protected.';
+        } else if (error.message.includes('Could not find video data')) {
+            errorMessage = 'Could not find video data on the page. The page structure may have changed.';
+        }
+        res.status(500).json({ error: errorMessage });
     } finally {
-        // Ensure the browser is always closed, even if an error occurs.
         if (browser) {
             await browser.close();
         }
