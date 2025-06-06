@@ -45,9 +45,11 @@
         <div id="status" class="text-center min-h-[80px] flex items-center justify-center">
             <div id="error" class="hidden text-red-400 bg-red-900/50 p-4 rounded-lg w-full"></div>
             <div id="result" class="hidden text-center">
+                <!-- Element to display the course title -->
+                <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
+                
                 <p class="text-gray-400 text-lg">Total Runtime:</p>
                 <p id="totalDuration" class="text-4xl md:text-5xl font-bold text-green-400"></p>
-                <!-- **NEW**: Element to display the video count -->
                 <p id="videoCount" class="text-gray-500 text-sm mt-2"></p>
             </div>
         </div>
@@ -60,8 +62,9 @@
         const loader = document.getElementById('loader');
         const errorDisplay = document.getElementById('error');
         const resultDisplay = document.getElementById('result');
+        const courseTitleDisplay = document.getElementById('courseTitle');
         const totalDurationDisplay = document.getElementById('totalDuration');
-        const videoCountDisplay = document.getElementById('videoCount'); // **NEW**: Get the new element
+        const videoCountDisplay = document.getElementById('videoCount');
 
         calculateBtn.addEventListener('click', handleCalculation);
         wistiaUrlInput.addEventListener('keypress', (e) => {
@@ -88,8 +91,7 @@
                     throw new Error(data.error || 'An unknown error occurred on the server.');
                 }
                 
-                // **MODIFIED**: Pass both totalSeconds and videoCount to the showResult function.
-                showResult(data.totalSeconds, data.videoCount);
+                showResult(data.courseTitle, data.totalSeconds, data.videoCount);
 
             } catch (err) {
                 console.error('Calculation Error:', err);
@@ -127,12 +129,14 @@
             errorDisplay.classList.remove('hidden');
         }
         
-        // **MODIFIED**: The function now accepts and displays the count.
-        function showResult(seconds, count) {
+        function showResult(title, seconds, count) {
             const duration = formatDuration(seconds);
             errorDisplay.classList.add('hidden');
+
+            courseTitleDisplay.textContent = title;
             totalDurationDisplay.textContent = duration;
             videoCountDisplay.textContent = `(from ${count} videos)`;
+            
             resultDisplay.classList.remove('hidden');
         }
     </script>
