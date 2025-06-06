@@ -47,6 +47,8 @@
             <div id="result" class="hidden text-center">
                 <p class="text-gray-400 text-lg">Total Runtime:</p>
                 <p id="totalDuration" class="text-4xl md:text-5xl font-bold text-green-400"></p>
+                <!-- **NEW**: Element to display the video count -->
+                <p id="videoCount" class="text-gray-500 text-sm mt-2"></p>
             </div>
         </div>
     </div>
@@ -59,6 +61,7 @@
         const errorDisplay = document.getElementById('error');
         const resultDisplay = document.getElementById('result');
         const totalDurationDisplay = document.getElementById('totalDuration');
+        const videoCountDisplay = document.getElementById('videoCount'); // **NEW**: Get the new element
 
         calculateBtn.addEventListener('click', handleCalculation);
         wistiaUrlInput.addEventListener('keypress', (e) => {
@@ -74,28 +77,24 @@
                 return;
             }
 
-            // --- UI Changes: Show loading state ---
             showLoader(true);
 
             try {
-                // --- Call our own backend API ---
                 const apiUrl = `/api/get-duration?url=${encodeURIComponent(url)}`;
                 const response = await fetch(apiUrl);
                 const data = await response.json();
 
                 if (!response.ok) {
-                    // Use the error from the server's JSON response, or a default message
                     throw new Error(data.error || 'An unknown error occurred on the server.');
                 }
-
-                const formattedDuration = formatDuration(data.totalSeconds);
-                showResult(formattedDuration);
+                
+                // **MODIFIED**: Pass both totalSeconds and videoCount to the showResult function.
+                showResult(data.totalSeconds, data.videoCount);
 
             } catch (err) {
                 console.error('Calculation Error:', err);
                 showError(err.message);
             } finally {
-                // --- UI Changes: Hide loading state ---
                 showLoader(false);
             }
         }
@@ -127,10 +126,13 @@
             errorDisplay.textContent = message;
             errorDisplay.classList.remove('hidden');
         }
-
-        function showResult(duration) {
+        
+        // **MODIFIED**: The function now accepts and displays the count.
+        function showResult(seconds, count) {
+            const duration = formatDuration(seconds);
             errorDisplay.classList.add('hidden');
             totalDurationDisplay.textContent = duration;
+            videoCountDisplay.textContent = `(from ${count} videos)`;
             resultDisplay.classList.remove('hidden');
         }
     </script>
