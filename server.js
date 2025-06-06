@@ -50,37 +50,32 @@ app.get('/api/get-duration', async (req, res) => {
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
         // Wait for the specific container for each video to appear on the page.
-        // Based on the provided HTML, 'div.MediaContainer-iGTxDE' is the correct selector.
         await page.waitForSelector('div.MediaContainer-iGTxDE', { timeout: 30000 });
 
-
-        // Evaluate the page by parsing the DOM for <time> tags.
-        const totalSeconds = await page.evaluate(() => {
+        // **MODIFIED**: This function now returns an object with both seconds and video count.
+        const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
-            let seconds = 0;
+            
+            const result = {
+                totalSeconds: 0,
+                videoCount: 0,
+            };
 
             const parseTime = (timeStr) => {
                 const parts = timeStr.trim().split(':').map(Number);
-                if (parts.length === 3) { // HH:MM:SS
-                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-                } else if (parts.length === 2) { // MM:SS
-                    return parts[0] * 60 + parts[1];
-                } else if (parts.length === 1) { // SS
-                    return parts[0];
-                }
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 1) return parts[0];
                 return 0;
             };
 
-            // **CORRECTED SELECTOR**: Use the class for the div that wraps each individual video item.
             const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
             if (videoItems.length === 0) {
                 return null;
             }
 
             videoItems.forEach(item => {
-                // The section title is in a sibling element *before* the list of videos.
-                // We need to find the collapsible group this video belongs to.
-                const sectionContainer = item.closest('.sc-fXSgeo'); // This is the container for the whole section
+                const sectionContainer = item.closest('.sc-fXSgeo');
                 let sectionName = '';
                 if (sectionContainer) {
                     const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
@@ -92,20 +87,22 @@ app.get('/api/get-duration', async (req, res) => {
                 if (!EXCLUDED_SECTIONS.includes(sectionName)) {
                     const timeEl = item.querySelector('time');
                     if (timeEl) {
-                        seconds += parseTime(timeEl.textContent);
+                        result.totalSeconds += parseTime(timeEl.textContent);
+                        result.videoCount++; // Increment the counter
                     }
                 }
             });
 
-            return seconds;
+            return result;
         });
 
-        if (totalSeconds === null) {
+        if (calculationData === null) {
             throw new Error('Could not find any video items on the page with the expected structure.');
         }
 
         // --- Success Response ---
-        res.json({ totalSeconds });
+        // **MODIFIED**: Send the whole object back to the client.
+        res.json(calculationData);
 
     } catch (error) {
         console.error('Scraping failed:', error);
