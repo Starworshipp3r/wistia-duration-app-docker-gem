@@ -11,26 +11,30 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            /* The fallback color is displayed first */
             background-color: #1a1a1a;
+            /* We need to hide the overflow to prevent scrollbars from the scaled background */
+            overflow: hidden;
         }
 
-        /* **NEW**: Use a pseudo-element for the background to enable fading */
         body::before {
             content: '';
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            /* Place the background image here */
+            /* **FIX**: Make the container even larger to guarantee no cutoff. */
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            
             background-image: url('https://app.box.com/shared/static/igh19gzrj3v1fl9m0aas9w05cmgeyt81.png');
             background-size: cover;
             background-position: center;
-            /* Use animation to fade in */
+            
             opacity: 0;
-            animation: fadeInBackground 1.5s ease-in forwards;
-            /* Keep it behind all other content */
+            filter: blur(8px);
+            animation: 
+                fadeInBackground 1.5s ease-in forwards,
+                rotateBackground 80s linear infinite; /* Increased duration for a slower rotation */
+            
             z-index: -1;
         }
 
@@ -48,10 +52,18 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* **NEW**: Keyframes for the fade-in animation */
         @keyframes fadeInBackground {
             to {
                 opacity: 1;
+            }
+        }
+
+        @keyframes rotateBackground {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
             }
         }
     </style>
