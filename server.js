@@ -49,95 +49,61 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **FIX FOR RACE CONDITION**: Instead of just waiting for the first element,
-        // we'll now wait until the video count on the page stabilizes.
-        await page.waitForSelector('div.MediaContainer-iGTxDE', { timeout: 30000 });
-        
-        console.log('Initial video containers found. Waiting for list to stabilize...');
+        // **DEFINITIVE FIX**: Wait specifically for the script tag that contains the JSON data.
+        // This is the most reliable way to know the page has all its data ready.
+        await page.waitForFunction(
+          'Array.from(document.querySelectorAll("script")).some(s => s.textContent.includes("window.folderPage.folder"))',
+          { timeout: 30000 } // Wait for up to 30 seconds.
+        );
 
-        await page.evaluate(async () => {
-            await new Promise((resolve) => {
-                let lastHeight = 0;
-                let stableCount = 0;
-                const interval = setInterval(() => {
-                    const currentHeight = document.body.scrollHeight;
-                    if (currentHeight === lastHeight) {
-                        stableCount++;
-                        if (stableCount >= 5) { // Wait for 5 stable checks (total ~2.5 seconds)
-                            clearInterval(interval);
-                            resolve();
-                        }
-                    } else {
-                        stableCount = 0;
-                        lastHeight = currentHeight;
-                    }
-                }, 500);
-            });
-        });
-        
-        console.log('Video list has stabilized. Starting calculation.');
-
-
-        // This evaluation logic now runs after we're confident the page is fully loaded.
+        // **NEW LOGIC**: Extract the data directly from the JSON object in the page script.
+        // This is faster and more reliable than parsing the DOM.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
-            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
-            const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
+            let projectData = null;
+            const scripts = Array.from(document.querySelectorAll('script'));
+            for (const script of scripts) {
+                if (script.textContent.includes('window.folderPage.folder =')) {
+                    const match = script.textContent.match(/window\.folderPage\.folder = (\{.*\});/s);
+                    if (match && match[1]) {
+                        projectData = JSON.parse(match[1]);
+                        break; 
+                    }
+                }
+            }
 
-            const includedSectionsSet = new Set();
-
-            const result = {
-                totalSeconds: 0,
-                videoCount: 0,
-                courseTitle: courseTitle,
-                includedSections: [],
-            };
-
-            const parseTime = (timeStr) => {
-                const parts = timeStr.trim().split(':').map(Number);
-                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-                if (parts.length === 2) return parts[0] * 60 + parts[1];
-                if (parts.length === 1) return parts[0];
-                return 0;
-            };
-
-            const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
-            if (videoItems.length === 0) {
+            if (!projectData || !projectData.medias) {
+                // This will be returned to the server and throw an error.
                 return null;
             }
 
-            videoItems.forEach(item => {
-                const sectionContainer = item.closest('.sc-fXSgeo');
-                let sectionName = '';
-                if (sectionContainer) {
-                    const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
-                    if (titleEl) {
-                        sectionName = titleEl.textContent.trim();
-                    }
-                }
+            const includedSectionsSet = new Set();
+            const result = {
+                totalSeconds: 0,
+                videoCount: 0,
+                courseTitle: projectData.name || 'Unknown Course',
+                includedSections: [],
+            };
 
-                if (!EXCLUDED_SECTIONS.includes(sectionName)) {
-                    const timeEl = item.querySelector('time');
-                    if (timeEl) {
-                        result.totalSeconds += parseTime(timeEl.textContent);
-                        result.videoCount++;
-                        if (sectionName) {
-                            includedSectionsSet.add(sectionName);
-                        }
+            projectData.medias.forEach(video => {
+                if (video.section && !EXCLUDED_SECTIONS.includes(video.section.name)) {
+                    result.totalSeconds += video.duration || 0;
+                    result.videoCount++;
+                    if (video.section.name) {
+                        includedSectionsSet.add(video.section.name);
                     }
                 }
             });
             
             result.includedSections = Array.from(includedSectionsSet);
-
             return result;
         });
 
-        if (calculationData === null || calculationData.videoCount === 0) {
-            throw new Error('Could not find any video items on the page with the expected structure.');
+        if (calculationData === null) {
+            throw new Error('Could not find the embedded video data on the page. The page structure has likely changed.');
         }
-        
+
         console.log(`Calculation complete: ${calculationData.videoCount} videos, ${calculationData.totalSeconds} seconds.`);
         res.json(calculationData);
 
