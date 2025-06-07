@@ -19,7 +19,9 @@
         body::before {
             content: '';
             position: fixed;
-            /* Use viewport units to create a massive background canvas */
+            /* **FIX**: Use viewport units to create a massive background canvas. 
+               This guarantees the corners are never visible on any screen size during rotation.
+            */
             top: 50%;
             left: 50%;
             width: 300vw;
@@ -86,8 +88,7 @@
             </button>
         </div>
 
-        <!-- **MODIFIED**: Removed the min-h-[80px] class to collapse the empty space -->
-        <div id="status" class="text-center py-4 flex items-center justify-center">
+        <div id="status" class="text-center min-h-[80px] flex items-center justify-center">
             <div id="error" class="hidden text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
             <div id="result" class="hidden text-center">
                 <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
