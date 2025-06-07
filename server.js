@@ -49,21 +49,23 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // Wait for a core element to appear, like the title container.
-        await page.waitForSelector('div.TitleAndDescriptionContainer-wZVJS', { timeout: 30000 });
+        await page.waitForSelector('div.MediaContainer-iGTxDE', { timeout: 30000 });
 
-        // **MODIFIED**: This function now also scrapes the course title.
+        // **MODIFIED**: This function now also scrapes the included section titles.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
-            // **NEW**: Scrape the course title.
             const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
+
+            // Use a Set to automatically handle duplicate section names.
+            const includedSectionsSet = new Set();
 
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
-                courseTitle: courseTitle // Add title to the result object
+                courseTitle: courseTitle,
+                includedSections: [], // Initialize the array
             };
 
             const parseTime = (timeStr) => {
@@ -76,8 +78,7 @@ app.get('/api/get-duration', async (req, res) => {
 
             const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
             if (videoItems.length === 0) {
-                // Return just the title if no videos are found yet.
-                return result;
+                return null;
             }
 
             videoItems.forEach(item => {
@@ -95,19 +96,24 @@ app.get('/api/get-duration', async (req, res) => {
                     if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
+                        // Add the valid section name to our set.
+                        if (sectionName) {
+                            includedSectionsSet.add(sectionName);
+                        }
                     }
                 }
             });
+            
+            // Convert the Set to an array to include it in the result.
+            result.includedSections = Array.from(includedSectionsSet);
 
             return result;
         });
 
         if (calculationData === null || calculationData.videoCount === 0) {
-            // Check for both null and zero videos to ensure we have content.
             throw new Error('Could not find any video items on the page with the expected structure.');
         }
 
-        // --- Success Response ---
         res.json(calculationData);
 
     } catch (error) {
