@@ -12,20 +12,23 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #1a1a1a;
-            /* We need to hide the overflow to prevent scrollbars from the scaled background */
+            /* Hide the overflow from our oversized, rotating background */
             overflow: hidden;
         }
 
         body::before {
             content: '';
             position: fixed;
-            /* **FIX**: Make the container even larger to guarantee no cutoff. */
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
+            /* **FIX**: Use viewport units to create a massive background canvas. 
+               This guarantees the corners are never visible on any screen size during rotation.
+            */
+            top: 50%;
+            left: 50%;
+            width: 300vw;
+            height: 300vh;
+            transform: translate(-50%, -50%); /* Center the massive element */
             
-            background-image: url('https://app.box.com/shared/static/euq5qprpq8h7z9wdzcfpbqkcociwia91.jpg');
+            background-image: url('https://app.box.com/shared/static/igh19gzrj3v1fl9m0aas9w05cmgeyt81.png');
             background-size: cover;
             background-position: center;
             
@@ -33,7 +36,7 @@
             filter: blur(8px);
             animation: 
                 fadeInBackground 1.5s ease-in forwards,
-                rotateBackground 80s linear infinite; /* Increased duration for a slower rotation */
+                rotateBackground 120s linear infinite; /* Increased duration for an even slower rotation */
             
             z-index: -1;
         }
@@ -60,10 +63,10 @@
 
         @keyframes rotateBackground {
             from {
-                transform: rotate(0deg);
+                transform: translate(-50%, -50%) rotate(0deg);
             }
             to {
-                transform: rotate(360deg);
+                transform: translate(-50%, -50%) rotate(360deg);
             }
         }
     </style>
