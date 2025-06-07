@@ -49,49 +49,61 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **DEFINITIVE FIX**: Wait specifically for the script tag that contains the JSON data.
-        // This is the most reliable way to know the page has all its data ready.
-        await page.waitForFunction(
-          'Array.from(document.querySelectorAll("script")).some(s => s.textContent.includes("window.folderPage.folder"))',
-          { timeout: 30000 } // Wait for up to 30 seconds.
-        );
+        // **FIXED**: Reverted to a simpler, more stable waiting mechanism.
+        // First, wait for the container that holds the video sections to appear.
+        await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
 
-        // **NEW LOGIC**: Extract the data directly from the JSON object in the page script.
-        // This is faster and more reliable than parsing the DOM.
+        // Then, add a hardcoded delay to give the dynamic content time to fully render.
+        // This is less complex and much less likely to crash than the previous logic.
+        await page.waitForTimeout(3000);
+
+
+        // This logic parses the fully-rendered HTML for the <time> tags.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
-            let projectData = null;
-            const scripts = Array.from(document.querySelectorAll('script'));
-            for (const script of scripts) {
-                if (script.textContent.includes('window.folderPage.folder =')) {
-                    const match = script.textContent.match(/window\.folderPage\.folder = (\{.*\});/s);
-                    if (match && match[1]) {
-                        projectData = JSON.parse(match[1]);
-                        break; 
-                    }
-                }
-            }
-
-            if (!projectData || !projectData.medias) {
-                // This will be returned to the server and throw an error.
-                return null;
-            }
+            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
+            const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
             const includedSectionsSet = new Set();
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
-                courseTitle: projectData.name || 'Unknown Course',
+                courseTitle: courseTitle,
                 includedSections: [],
             };
 
-            projectData.medias.forEach(video => {
-                if (video.section && !EXCLUDED_SECTIONS.includes(video.section.name)) {
-                    result.totalSeconds += video.duration || 0;
-                    result.videoCount++;
-                    if (video.section.name) {
-                        includedSectionsSet.add(video.section.name);
+            const parseTime = (timeStr) => {
+                const parts = timeStr.trim().split(':').map(Number);
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 1) return parts[0];
+                return 0;
+            };
+
+            const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
+            if (videoItems.length === 0) {
+                return null;
+            }
+
+            videoItems.forEach(item => {
+                const sectionContainer = item.closest('.sc-fXSgeo');
+                let sectionName = '';
+                if (sectionContainer) {
+                    const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
+                    if (titleEl) {
+                        sectionName = titleEl.textContent.trim();
+                    }
+                }
+
+                if (!EXCLUDED_SECTIONS.includes(sectionName)) {
+                    const timeEl = item.querySelector('time');
+                    if (timeEl) {
+                        result.totalSeconds += parseTime(timeEl.textContent);
+                        result.videoCount++;
+                        if (sectionName) {
+                            includedSectionsSet.add(sectionName);
+                        }
                     }
                 }
             });
@@ -100,8 +112,8 @@ app.get('/api/get-duration', async (req, res) => {
             return result;
         });
 
-        if (calculationData === null) {
-            throw new Error('Could not find the embedded video data on the page. The page structure has likely changed.');
+        if (calculationData === null || calculationData.videoCount === 0) {
+            throw new Error('Could not find any video items on the page with the expected structure.');
         }
 
         console.log(`Calculation complete: ${calculationData.videoCount} videos, ${calculationData.totalSeconds} seconds.`);
