@@ -72,8 +72,8 @@
             <div id="result" class="hidden text-center">
                 <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
                 <p class="text-gray-200 text-lg">Total Runtime:</p>
-                <!-- **MODIFIED**: Made this element slightly smaller to better fit the new text format -->
-                <p id="totalDuration" class="text-3xl md:text-4xl font-bold text-white"></p>
+                <!-- **MODIFIED**: Reduced font size to ensure it fits on one line -->
+                <p id="totalDuration" class="text-2xl md:text-3xl font-bold text-white"></p>
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
                 
                 <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
@@ -133,7 +133,6 @@
             }
         }
 
-        // **MODIFIED**: Rewrote this function for human-readable output
         function formatDuration(totalSeconds) {
             if (isNaN(totalSeconds)) return '0 seconds';
             if (totalSeconds === 0) return '0 seconds';
@@ -153,7 +152,6 @@
                 parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
             }
 
-            // Join the parts with commas and an "and" for the last part.
             if (parts.length > 1) {
                 const last = parts.pop();
                 return parts.join(', ') + ', and ' + last;
@@ -197,7 +195,6 @@
 
             detailsContainer.classList.add('hidden');
             detailsBtn.textContent = 'View details';
-
             resultDisplay.classList.remove('hidden');
 
             if (sections && sections.length > 0) {
