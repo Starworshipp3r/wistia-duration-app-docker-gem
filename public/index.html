@@ -49,13 +49,6 @@
             from { transform: translate(-50%, -50%) rotate(0deg); }
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
-        
-        /* Simple transition for the details container */
-        #detailsContainer {
-            transition: all 0.3s ease-in-out;
-            max-height: 0;
-            overflow: hidden;
-        }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
@@ -83,12 +76,13 @@
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
                 
                 <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
+                
+                <!-- Details container, now safely placed inside the results div -->
+                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg">
+                    <h3 class="font-semibold mb-2">Included Sections:</h3>
+                    <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
+                </div>
             </div>
-        </div>
-        <!-- Moved details container outside of the main status div for better layout control -->
-        <div id="detailsContainer" class="mt-4 text-left bg-white/5 p-4 rounded-lg">
-            <h3 class="font-semibold mb-2">Included Sections:</h3>
-            <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
         </div>
     </div>
 
@@ -106,23 +100,19 @@
         const detailsContainer = document.getElementById('detailsContainer');
         const sectionList = document.getElementById('sectionList');
 
-        // Hide details container on initial load
-        detailsContainer.style.maxHeight = '0';
-        detailsContainer.style.padding = '0';
-        detailsContainer.style.border = 'none';
+        // Event listener for the "Calculate" button
+        calculateBtn.addEventListener('click', handleCalculation);
+        
+        // Event listener for pressing Enter in the input field
+        wistiaUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCalculation();
+        });
 
+        // **FIXED**: Simplified event listener for the details button
         detailsBtn.addEventListener('click', () => {
-            const isHidden = detailsContainer.style.maxHeight === '0px';
-            if (isHidden) {
-                detailsContainer.style.maxHeight = detailsContainer.scrollHeight + 'px';
-                detailsContainer.style.padding = '1rem';
-                detailsContainer.style.border = ''; // uses default styles
-                detailsBtn.textContent = 'Hide details';
-            } else {
-                detailsContainer.style.maxHeight = '0';
-                detailsContainer.style.padding = '0 1rem'; // Keep horizontal padding during collapse
-                detailsBtn.textContent = 'View details';
-            }
+            const isHidden = detailsContainer.classList.contains('hidden');
+            detailsContainer.classList.toggle('hidden');
+            detailsBtn.textContent = isHidden ? 'Hide details' : 'View details';
         });
 
         async function handleCalculation() {
@@ -155,19 +145,15 @@
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         }
 
+        // **FIXED**: Simplified showLoader function
         function showLoader(isLoading) {
             if (isLoading) {
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
                 loader.classList.remove('hidden');
+                // Hide all previous results/errors
                 errorDisplay.classList.add('hidden');
                 resultDisplay.classList.add('hidden');
-                // **FIX**: Ensure the details are hidden when a new calculation starts
-                detailsBtn.classList.add('hidden');
-                detailsContainer.style.maxHeight = '0';
-                detailsContainer.style.padding = '0';
-                detailsContainer.style.border = 'none';
-                detailsBtn.textContent = 'View details';
             } else {
                 calculateBtn.disabled = false;
                 buttonText.classList.remove('hidden');
@@ -181,24 +167,33 @@
             errorDisplay.classList.remove('hidden');
         }
         
+        // **FIXED**: Simplified showResult function
         function showResult(title, seconds, count, sections) {
             errorDisplay.classList.add('hidden');
             courseTitleDisplay.textContent = title;
             totalDurationDisplay.textContent = formatDuration(seconds);
             videoCountDisplay.textContent = `(from ${count} videos)`;
             
-            // Populate the list before showing the button
+            // Populate the list
             sectionList.innerHTML = '';
-            sections.forEach(section => {
+            (sections || []).forEach(section => {
                 const li = document.createElement('li');
                 li.textContent = section;
                 sectionList.appendChild(li);
             });
 
+            // Reset details button state
+            detailsContainer.classList.add('hidden');
+            detailsBtn.textContent = 'View details';
+
+            // Show the main result container
             resultDisplay.classList.remove('hidden');
-            // **FIX**: Only show the button if there are sections to display
+
+            // Only show the button if there are sections to display
             if (sections && sections.length > 0) {
               detailsBtn.classList.remove('hidden');
+            } else {
+              detailsBtn.classList.add('hidden');
             }
         }
     </script>
