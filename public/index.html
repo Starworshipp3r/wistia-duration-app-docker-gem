@@ -49,6 +49,13 @@
             from { transform: translate(-50%, -50%) rotate(0deg); }
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
+        
+        /* Simple transition for the details container */
+        #detailsContainer {
+            transition: all 0.3s ease-in-out;
+            max-height: 0;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
@@ -75,13 +82,13 @@
                 <p id="totalDuration" class="text-4xl md:text-5xl font-bold text-white"></p>
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
                 
-                <!-- **NEW**: Details button and container -->
                 <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
-                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg">
-                    <h3 class="font-semibold mb-2">Included Sections:</h3>
-                    <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
-                </div>
             </div>
+        </div>
+        <!-- Moved details container outside of the main status div for better layout control -->
+        <div id="detailsContainer" class="mt-4 text-left bg-white/5 p-4 rounded-lg">
+            <h3 class="font-semibold mb-2">Included Sections:</h3>
+            <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
         </div>
     </div>
 
@@ -95,33 +102,25 @@
         const courseTitleDisplay = document.getElementById('courseTitle');
         const totalDurationDisplay = document.getElementById('totalDuration');
         const videoCountDisplay = document.getElementById('videoCount');
-        const detailsBtn = document.getElementById('detailsBtn'); // **NEW**
-        const detailsContainer = document.getElementById('detailsContainer'); // **NEW**
-        const sectionList = document.getElementById('sectionList'); // **NEW**
+        const detailsBtn = document.getElementById('detailsBtn');
+        const detailsContainer = document.getElementById('detailsContainer');
+        const sectionList = document.getElementById('sectionList');
 
-        let currentSections = []; // Store section data globally
+        // Hide details container on initial load
+        detailsContainer.style.maxHeight = '0';
+        detailsContainer.style.padding = '0';
+        detailsContainer.style.border = 'none';
 
-        calculateBtn.addEventListener('click', handleCalculation);
-        wistiaUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleCalculation();
-        });
-
-        // **NEW**: Event listener for the details button
         detailsBtn.addEventListener('click', () => {
-            const isHidden = detailsContainer.classList.contains('hidden');
+            const isHidden = detailsContainer.style.maxHeight === '0px';
             if (isHidden) {
-                // Populate and show the list
-                sectionList.innerHTML = ''; // Clear previous list
-                currentSections.forEach(section => {
-                    const li = document.createElement('li');
-                    li.textContent = section;
-                    sectionList.appendChild(li);
-                });
-                detailsContainer.classList.remove('hidden');
+                detailsContainer.style.maxHeight = detailsContainer.scrollHeight + 'px';
+                detailsContainer.style.padding = '1rem';
+                detailsContainer.style.border = ''; // uses default styles
                 detailsBtn.textContent = 'Hide details';
             } else {
-                // Hide the list
-                detailsContainer.classList.add('hidden');
+                detailsContainer.style.maxHeight = '0';
+                detailsContainer.style.padding = '0 1rem'; // Keep horizontal padding during collapse
                 detailsBtn.textContent = 'View details';
             }
         });
@@ -140,8 +139,7 @@
                 if (!response.ok) {
                     throw new Error(data.error || 'An unknown error occurred on the server.');
                 }
-                currentSections = data.includedSections || []; // Store data
-                showResult(data.courseTitle, data.totalSeconds, data.videoCount);
+                showResult(data.courseTitle, data.totalSeconds, data.videoCount, data.includedSections);
             } catch (err) {
                 showError(err.message);
             } finally {
@@ -158,17 +156,18 @@
         }
 
         function showLoader(isLoading) {
-            // Hide details whenever a new calculation starts
-            detailsContainer.classList.add('hidden');
-            detailsBtn.classList.add('hidden');
-            detailsBtn.textContent = 'View details';
-
             if (isLoading) {
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
                 loader.classList.remove('hidden');
                 errorDisplay.classList.add('hidden');
                 resultDisplay.classList.add('hidden');
+                // **FIX**: Ensure the details are hidden when a new calculation starts
+                detailsBtn.classList.add('hidden');
+                detailsContainer.style.maxHeight = '0';
+                detailsContainer.style.padding = '0';
+                detailsContainer.style.border = 'none';
+                detailsBtn.textContent = 'View details';
             } else {
                 calculateBtn.disabled = false;
                 buttonText.classList.remove('hidden');
@@ -182,16 +181,23 @@
             errorDisplay.classList.remove('hidden');
         }
         
-        function showResult(title, seconds, count) {
-            const duration = formatDuration(seconds);
+        function showResult(title, seconds, count, sections) {
             errorDisplay.classList.add('hidden');
             courseTitleDisplay.textContent = title;
-            totalDurationDisplay.textContent = duration;
+            totalDurationDisplay.textContent = formatDuration(seconds);
             videoCountDisplay.textContent = `(from ${count} videos)`;
             
-            // Show the main result container and the details button
+            // Populate the list before showing the button
+            sectionList.innerHTML = '';
+            sections.forEach(section => {
+                const li = document.createElement('li');
+                li.textContent = section;
+                sectionList.appendChild(li);
+            });
+
             resultDisplay.classList.remove('hidden');
-            if(currentSections.length > 0) {
+            // **FIX**: Only show the button if there are sections to display
+            if (sections && sections.length > 0) {
               detailsBtn.classList.remove('hidden');
             }
         }
