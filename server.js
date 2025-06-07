@@ -49,28 +49,23 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **FIXED**: Reverted to a simpler, more stable waiting mechanism.
-        // First, wait for the container that holds the video sections to appear.
-        await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
+        await page.waitForSelector('div.MediaContainer-iGTxDE', { timeout: 30000 });
 
-        // Then, add a hardcoded delay to give the dynamic content time to fully render.
-        // This is less complex and much less likely to crash than the previous logic.
-        await page.waitForTimeout(3000);
-
-
-        // This logic parses the fully-rendered HTML for the <time> tags.
+        // **MODIFIED**: This function now also scrapes the included section titles.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
             const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
+            // Use a Set to automatically handle duplicate section names.
             const includedSectionsSet = new Set();
+
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
                 courseTitle: courseTitle,
-                includedSections: [],
+                includedSections: [], // Initialize the array
             };
 
             const parseTime = (timeStr) => {
@@ -101,6 +96,7 @@ app.get('/api/get-duration', async (req, res) => {
                     if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
+                        // Add the valid section name to our set.
                         if (sectionName) {
                             includedSectionsSet.add(sectionName);
                         }
@@ -108,7 +104,9 @@ app.get('/api/get-duration', async (req, res) => {
                 }
             });
             
+            // Convert the Set to an array to include it in the result.
             result.includedSections = Array.from(includedSectionsSet);
+
             return result;
         });
 
@@ -116,7 +114,6 @@ app.get('/api/get-duration', async (req, res) => {
             throw new Error('Could not find any video items on the page with the expected structure.');
         }
 
-        console.log(`Calculation complete: ${calculationData.videoCount} videos, ${calculationData.totalSeconds} seconds.`);
         res.json(calculationData);
 
     } catch (error) {
