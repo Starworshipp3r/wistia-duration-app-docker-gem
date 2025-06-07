@@ -49,13 +49,12 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **FIXED**: Reverted to a simpler, more stable waiting mechanism.
         // First, wait for the container that holds the video sections to appear.
         await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
 
-        // Then, add a hardcoded delay to give the dynamic content time to fully render.
-        // This is less complex and much less likely to crash than the previous logic.
-        await page.waitForTimeout(3000);
+        // **FIX**: Replaced deprecated page.waitForTimeout() with the standard JavaScript equivalent.
+        // This creates a 3-second delay to allow all dynamic content to render.
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
 
         // This logic parses the fully-rendered HTML for the <time> tags.
