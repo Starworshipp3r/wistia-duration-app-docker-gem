@@ -72,12 +72,12 @@
             <div id="result" class="hidden text-center">
                 <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
                 <p class="text-gray-200 text-lg">Total Runtime:</p>
-                <p id="totalDuration" class="text-4xl md:text-5xl font-bold text-white"></p>
+                <!-- **MODIFIED**: Made this element slightly smaller to better fit the new text format -->
+                <p id="totalDuration" class="text-3xl md:text-4xl font-bold text-white"></p>
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
                 
                 <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
                 
-                <!-- Details container, now safely placed inside the results div -->
                 <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg">
                     <h3 class="font-semibold mb-2">Included Sections:</h3>
                     <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
@@ -100,15 +100,11 @@
         const detailsContainer = document.getElementById('detailsContainer');
         const sectionList = document.getElementById('sectionList');
 
-        // Event listener for the "Calculate" button
         calculateBtn.addEventListener('click', handleCalculation);
-        
-        // Event listener for pressing Enter in the input field
         wistiaUrlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculation();
         });
 
-        // **FIXED**: Simplified event listener for the details button
         detailsBtn.addEventListener('click', () => {
             const isHidden = detailsContainer.classList.contains('hidden');
             detailsContainer.classList.toggle('hidden');
@@ -137,21 +133,40 @@
             }
         }
 
+        // **MODIFIED**: Rewrote this function for human-readable output
         function formatDuration(totalSeconds) {
-            if (isNaN(totalSeconds)) return '00:00:00';
+            if (isNaN(totalSeconds)) return '0 seconds';
+            if (totalSeconds === 0) return '0 seconds';
+
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = Math.floor(totalSeconds % 60);
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            const parts = [];
+            if (hours > 0) {
+                parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+            }
+            if (minutes > 0) {
+                parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+            }
+            if (seconds > 0) {
+                parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+            }
+
+            // Join the parts with commas and an "and" for the last part.
+            if (parts.length > 1) {
+                const last = parts.pop();
+                return parts.join(', ') + ', and ' + last;
+            }
+
+            return parts[0];
         }
 
-        // **FIXED**: Simplified showLoader function
         function showLoader(isLoading) {
             if (isLoading) {
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
                 loader.classList.remove('hidden');
-                // Hide all previous results/errors
                 errorDisplay.classList.add('hidden');
                 resultDisplay.classList.add('hidden');
             } else {
@@ -167,14 +182,12 @@
             errorDisplay.classList.remove('hidden');
         }
         
-        // **FIXED**: Simplified showResult function
         function showResult(title, seconds, count, sections) {
             errorDisplay.classList.add('hidden');
             courseTitleDisplay.textContent = title;
             totalDurationDisplay.textContent = formatDuration(seconds);
             videoCountDisplay.textContent = `(from ${count} videos)`;
             
-            // Populate the list
             sectionList.innerHTML = '';
             (sections || []).forEach(section => {
                 const li = document.createElement('li');
@@ -182,14 +195,11 @@
                 sectionList.appendChild(li);
             });
 
-            // Reset details button state
             detailsContainer.classList.add('hidden');
             detailsBtn.textContent = 'View details';
 
-            // Show the main result container
             resultDisplay.classList.remove('hidden');
 
-            // Only show the button if there are sections to display
             if (sections && sections.length > 0) {
               detailsBtn.classList.remove('hidden');
             } else {
