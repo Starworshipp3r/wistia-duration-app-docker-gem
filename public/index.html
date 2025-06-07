@@ -12,32 +12,25 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #1a1a1a;
-            /* Hide the overflow from our oversized, rotating background */
             overflow: hidden;
         }
 
         body::before {
             content: '';
             position: fixed;
-            /* **FIX**: Use viewport units to create a massive background canvas. 
-               This guarantees the corners are never visible on any screen size during rotation.
-            */
             top: 50%;
             left: 50%;
             width: 300vw;
             height: 300vh;
-            transform: translate(-50%, -50%); /* Center the massive element */
-            
+            transform: translate(-50%, -50%);
             background-image: url('https://app.box.com/shared/static/blkmwh9wa10rnb85nnalpm7krgusr4y7.jpg');
             background-size: cover;
             background-position: center;
-            
             opacity: 0;
             filter: blur(8px);
             animation: 
                 fadeInBackground 1.5s ease-in forwards,
                 rotateBackground 50s linear infinite;
-            
             z-index: -1;
         }
 
@@ -50,30 +43,16 @@
             animation: spin 1s ease infinite;
         }
         
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeInBackground {
-            to {
-                opacity: 1;
-            }
-        }
-
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeInBackground { to { opacity: 1; } }
         @keyframes rotateBackground {
-            from {
-                transform: translate(-50%, -50%) rotate(0deg);
-            }
-            to {
-                transform: translate(-50%, -50%) rotate(360deg);
-            }
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
 
-    <!-- The acrylic/frosted glass effect container -->
     <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-black/30 rounded-2xl shadow-2xl backdrop-blur-xl border border-gray-100/20">
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Wistia Runtime Calculator</h1>
@@ -92,10 +71,16 @@
             <div id="error" class="hidden text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
             <div id="result" class="hidden text-center">
                 <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
-                
                 <p class="text-gray-200 text-lg">Total Runtime:</p>
                 <p id="totalDuration" class="text-4xl md:text-5xl font-bold text-white"></p>
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
+                
+                <!-- **NEW**: Details button and container -->
+                <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
+                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg">
+                    <h3 class="font-semibold mb-2">Included Sections:</h3>
+                    <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
+                </div>
             </div>
         </div>
     </div>
@@ -110,11 +95,34 @@
         const courseTitleDisplay = document.getElementById('courseTitle');
         const totalDurationDisplay = document.getElementById('totalDuration');
         const videoCountDisplay = document.getElementById('videoCount');
+        const detailsBtn = document.getElementById('detailsBtn'); // **NEW**
+        const detailsContainer = document.getElementById('detailsContainer'); // **NEW**
+        const sectionList = document.getElementById('sectionList'); // **NEW**
+
+        let currentSections = []; // Store section data globally
 
         calculateBtn.addEventListener('click', handleCalculation);
         wistiaUrlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleCalculation();
+            if (e.key === 'Enter') handleCalculation();
+        });
+
+        // **NEW**: Event listener for the details button
+        detailsBtn.addEventListener('click', () => {
+            const isHidden = detailsContainer.classList.contains('hidden');
+            if (isHidden) {
+                // Populate and show the list
+                sectionList.innerHTML = ''; // Clear previous list
+                currentSections.forEach(section => {
+                    const li = document.createElement('li');
+                    li.textContent = section;
+                    sectionList.appendChild(li);
+                });
+                detailsContainer.classList.remove('hidden');
+                detailsBtn.textContent = 'Hide details';
+            } else {
+                // Hide the list
+                detailsContainer.classList.add('hidden');
+                detailsBtn.textContent = 'View details';
             }
         });
 
@@ -124,22 +132,17 @@
                 showError('Please enter a Wistia folder URL.');
                 return;
             }
-
             showLoader(true);
-
             try {
                 const apiUrl = `/api/get-duration?url=${encodeURIComponent(url)}`;
                 const response = await fetch(apiUrl);
                 const data = await response.json();
-
                 if (!response.ok) {
                     throw new Error(data.error || 'An unknown error occurred on the server.');
                 }
-                
+                currentSections = data.includedSections || []; // Store data
                 showResult(data.courseTitle, data.totalSeconds, data.videoCount);
-
             } catch (err) {
-                console.error('Calculation Error:', err);
                 showError(err.message);
             } finally {
                 showLoader(false);
@@ -155,6 +158,11 @@
         }
 
         function showLoader(isLoading) {
+            // Hide details whenever a new calculation starts
+            detailsContainer.classList.add('hidden');
+            detailsBtn.classList.add('hidden');
+            detailsBtn.textContent = 'View details';
+
             if (isLoading) {
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
@@ -177,12 +185,15 @@
         function showResult(title, seconds, count) {
             const duration = formatDuration(seconds);
             errorDisplay.classList.add('hidden');
-
             courseTitleDisplay.textContent = title;
             totalDurationDisplay.textContent = duration;
             videoCountDisplay.textContent = `(from ${count} videos)`;
             
+            // Show the main result container and the details button
             resultDisplay.classList.remove('hidden');
+            if(currentSections.length > 0) {
+              detailsBtn.classList.remove('hidden');
+            }
         }
     </script>
 </body>
