@@ -49,15 +49,42 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // First, wait for the container that holds the video sections to appear.
-        await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
+        // **NEW "SMART WAIT" LOGIC**:
+        // This function will run inside the browser and will only resolve its Promise
+        // once the page height has stopped changing, indicating all content has loaded.
+        await page.evaluate(async () => {
+            await new Promise((resolve, reject) => {
+                let lastHeight = 0;
+                let stableChecks = 0;
+                const maxStableChecks = 5; // Require 5 stable checks (2.5 seconds of stability)
+                let totalChecks = 0;
 
-        // **FIX**: Replaced deprecated page.waitForTimeout() with the standard JavaScript equivalent.
-        // This creates a 6-second delay to allow all dynamic content to render.
-        await new Promise(resolve => setTimeout(resolve, 6000));
+                const interval = setInterval(() => {
+                    const currentHeight = document.body.scrollHeight;
+                    if (currentHeight > 0 && currentHeight === lastHeight) {
+                        stableChecks++;
+                    } else {
+                        stableChecks = 0; // Reset counter if height changes
+                        lastHeight = currentHeight;
+                    }
 
+                    // If height is stable for the required number of checks, we're done.
+                    if (stableChecks >= maxStableChecks) {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                    
+                    // Failsafe timeout to prevent infinite loops
+                    totalChecks++;
+                    if (totalChecks > 60) { // 30 second timeout
+                        clearInterval(interval);
+                        reject(new Error("Page did not stabilize within 30 seconds."));
+                    }
+                }, 500);
+            });
+        });
 
-        // This logic parses the fully-rendered HTML for the <time> tags.
+        // This logic now runs only after the page has fully stabilized.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
