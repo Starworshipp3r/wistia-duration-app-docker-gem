@@ -49,46 +49,16 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **NEW "SMART WAIT" LOGIC**:
-        // This function will run inside the browser and will only resolve its Promise
-        // once the page height has stopped changing, indicating all content has loaded.
-        await page.evaluate(async () => {
-            await new Promise((resolve, reject) => {
-                let lastHeight = 0;
-                let stableChecks = 0;
-                const maxStableChecks = 5; // Require 5 stable checks (2.5 seconds of stability)
-                let totalChecks = 0;
+        // **NEW ROBUST SELECTOR**: Wait for the test ID of the content blocks.
+        await page.waitForSelector('[data-testid="collapsible-group-content"]', { timeout: 30000 });
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Brief wait for all content to settle.
 
-                const interval = setInterval(() => {
-                    const currentHeight = document.body.scrollHeight;
-                    if (currentHeight > 0 && currentHeight === lastHeight) {
-                        stableChecks++;
-                    } else {
-                        stableChecks = 0; // Reset counter if height changes
-                        lastHeight = currentHeight;
-                    }
-
-                    // If height is stable for the required number of checks, we're done.
-                    if (stableChecks >= maxStableChecks) {
-                        clearInterval(interval);
-                        resolve();
-                    }
-                    
-                    // Failsafe timeout to prevent infinite loops
-                    totalChecks++;
-                    if (totalChecks > 60) { // 30 second timeout
-                        clearInterval(interval);
-                        reject(new Error("Page did not stabilize within 30 seconds."));
-                    }
-                }, 500);
-            });
-        });
-
-        // This logic now runs only after the page has fully stabilized.
+        // **REWRITTEN LOGIC**: This function now uses stable data-testid attributes instead of brittle CSS classes.
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
-            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
+            // Use a more generic selector for the main course title.
+            const titleElement = document.querySelector('h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
             const includedSectionsSet = new Set();
@@ -107,30 +77,33 @@ app.get('/api/get-duration', async (req, res) => {
                 return 0;
             };
 
-            const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
-            if (videoItems.length === 0) {
+            // Find all section content blocks using the stable test ID.
+            const sectionContentBlocks = document.querySelectorAll('[data-testid="collapsible-group-content"]');
+            if (sectionContentBlocks.length === 0) {
                 return null;
             }
 
-            videoItems.forEach(item => {
-                const sectionContainer = item.closest('.sc-fXSgeo');
+            sectionContentBlocks.forEach(contentBlock => {
+                // Find the title element associated with this content block.
+                const titleContainer = contentBlock.previousElementSibling;
                 let sectionName = '';
-                if (sectionContainer) {
-                    const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
+                if (titleContainer) {
+                    const titleEl = titleContainer.querySelector('div[id^="CollapsibleGroup_"]');
                     if (titleEl) {
                         sectionName = titleEl.textContent.trim();
                     }
                 }
 
                 if (!EXCLUDED_SECTIONS.includes(sectionName)) {
-                    const timeEl = item.querySelector('time');
-                    if (timeEl) {
+                    if (sectionName) {
+                        includedSectionsSet.add(sectionName);
+                    }
+                    
+                    const timeElements = contentBlock.querySelectorAll('time');
+                    timeElements.forEach(timeEl => {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
-                        if (sectionName) {
-                            includedSectionsSet.add(sectionName);
-                        }
-                    }
+                    });
                 }
             });
             
