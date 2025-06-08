@@ -49,16 +49,21 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **NEW ROBUST SELECTOR**: Wait for the test ID of the content blocks.
-        await page.waitForSelector('[data-testid="collapsible-group-content"]', { timeout: 30000 });
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Brief wait for all content to settle.
+        // **NEW**: Check if we were redirected to a login page.
+        const finalUrl = page.url();
+        if (finalUrl.includes('/session/new')) {
+            throw new Error('This Wistia folder is private and requires a login.');
+        }
 
-        // **REWRITTEN LOGIC**: This function now uses stable data-testid attributes instead of brittle CSS classes.
+        // Wait for a core element to appear.
+        await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
             
-            // Use a more generic selector for the main course title.
-            const titleElement = document.querySelector('h1');
+            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
             const includedSectionsSet = new Set();
@@ -77,33 +82,30 @@ app.get('/api/get-duration', async (req, res) => {
                 return 0;
             };
 
-            // Find all section content blocks using the stable test ID.
-            const sectionContentBlocks = document.querySelectorAll('[data-testid="collapsible-group-content"]');
-            if (sectionContentBlocks.length === 0) {
+            const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
+            if (videoItems.length === 0) {
                 return null;
             }
 
-            sectionContentBlocks.forEach(contentBlock => {
-                // Find the title element associated with this content block.
-                const titleContainer = contentBlock.previousElementSibling;
+            videoItems.forEach(item => {
+                const sectionContainer = item.closest('.sc-fXSgeo');
                 let sectionName = '';
-                if (titleContainer) {
-                    const titleEl = titleContainer.querySelector('div[id^="CollapsibleGroup_"]');
+                if (sectionContainer) {
+                    const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
                     if (titleEl) {
                         sectionName = titleEl.textContent.trim();
                     }
                 }
 
                 if (!EXCLUDED_SECTIONS.includes(sectionName)) {
-                    if (sectionName) {
-                        includedSectionsSet.add(sectionName);
-                    }
-                    
-                    const timeElements = contentBlock.querySelectorAll('time');
-                    timeElements.forEach(timeEl => {
+                    const timeEl = item.querySelector('time');
+                    if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
-                    });
+                        if (sectionName) {
+                            includedSectionsSet.add(sectionName);
+                        }
+                    }
                 }
             });
             
