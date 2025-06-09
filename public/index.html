@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wistia Project Runtime Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -51,12 +50,14 @@
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* **FIXED**: CSS for a smooth expand/collapse transition on the results container */
-        #result-container {
-            transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out;
+        /* CSS for the smooth expand/collapse transition */
+        .collapsible {
+            transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out, padding 0.4s ease-in-out;
             max-height: 0;
             opacity: 0;
             overflow: hidden;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
         }
     </style>
 </head>
@@ -76,25 +77,22 @@
             </button>
         </div>
         
-        <!-- This container now only holds the loader and error messages -->
         <div class="text-center py-2">
             <div id="loader" class="hidden spinner mx-auto"></div>
-            <div id="error" class="hidden text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
-        </div>
-
-        <!-- The results have their own container for better animation control -->
-        <div id="result-container">
-            <div id="result-content" class="py-4 text-center">
-                <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
-                <p class="text-gray-200 text-lg">Total Runtime:</p>
-                <p id="totalDuration" class="text-2xl md:text-3xl font-bold text-white"></p>
-                <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
-                
-                <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
-                
-                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg">
-                    <h3 class="font-semibold mb-2">Included Sections:</h3>
-                    <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
+            <div id="error" class="collapsible text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
+            <div id="result-container" class="collapsible text-center">
+                <div id="result-content" class="py-4">
+                    <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
+                    <p class="text-gray-200 text-lg">Total Runtime:</p>
+                    <p id="totalDuration" class="text-2xl md:text-3xl font-bold text-white"></p>
+                    <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
+                    
+                    <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
+                    
+                    <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg transition-all duration-300">
+                        <h3 class="font-semibold mb-2">Included Sections:</h3>
+                        <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -121,10 +119,11 @@
             if (e.key === 'Enter') handleCalculation();
         });
 
+        // **MODIFIED**: The button now shows the details and then hides itself.
         detailsBtn.addEventListener('click', () => {
-            detailsContainer.classList.toggle('hidden');
-            detailsBtn.textContent = detailsContainer.classList.contains('hidden') ? 'View details' : 'Hide details';
-            // Recalculate result height when details are toggled for the animation
+            detailsContainer.classList.remove('hidden');
+            detailsBtn.classList.add('hidden');
+            // Recalculate result height to animate the container expansion
             resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
         });
 
@@ -172,10 +171,13 @@
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
                 loaderIcon.classList.remove('hidden');
+                // Collapse previous results
                 resultContainer.style.maxHeight = '0';
                 resultContainer.style.opacity = '0';
-                errorDisplay.classList.add('hidden');
-                loader.classList.add('hidden'); // Ensure the central loader is hidden
+                resultContainer.style.padding = '0';
+                errorDisplay.style.maxHeight = '0';
+                errorDisplay.style.opacity = '0';
+                errorDisplay.style.padding = '0';
             } else {
                 calculateBtn.disabled = false;
                 buttonText.classList.remove('hidden');
@@ -185,12 +187,17 @@
 
         function showError(message) {
             errorDisplay.textContent = message;
-            errorDisplay.classList.remove('hidden');
-            loader.classList.add('hidden');
+            // Animate the error box to its full height
+            errorDisplay.style.maxHeight = errorDisplay.scrollHeight + 'px';
+            errorDisplay.style.opacity = '1';
+            errorDisplay.style.padding = '1rem';
         }
         
         function showResult(data) {
-            errorDisplay.classList.add('hidden');
+            errorDisplay.style.maxHeight = '0';
+            errorDisplay.style.opacity = '0';
+            errorDisplay.style.padding = '0';
+
             courseTitleDisplay.textContent = data.courseTitle;
             totalDurationDisplay.textContent = formatDuration(data.totalSeconds);
             videoCountDisplay.textContent = `(from ${data.videoCount} videos)`;
@@ -204,8 +211,7 @@
             });
 
             detailsContainer.classList.add('hidden');
-            detailsBtn.textContent = 'View details';
-
+            
             if (data.sectionDetails && data.sectionDetails.length > 0) {
               detailsBtn.classList.remove('hidden');
             } else {
@@ -214,6 +220,7 @@
 
             // Animate the result box to its full height
             resultContainer.style.opacity = '1';
+            resultContainer.style.padding = '1rem 0';
             resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
         }
     </script>
