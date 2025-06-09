@@ -49,16 +49,27 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
-        // **NEW**: Check if we were redirected to a login page.
-        const finalUrl = page.url();
-        if (finalUrl.includes('/session/new')) {
-            throw new Error('This Wistia folder is private and requires a login.');
-        }
-
-        // Wait for a core element to appear.
-        await page.waitForSelector('.sc-fXSgeo', { timeout: 30000 });
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                let lastHeight = 0;
+                let stableChecks = 0;
+                const maxStableChecks = 5;
+                const interval = setInterval(() => {
+                    window.scrollTo(0, document.body.scrollHeight);
+                    const currentHeight = document.body.scrollHeight;
+                    if (currentHeight === lastHeight) {
+                        stableChecks++;
+                    } else {
+                        stableChecks = 0;
+                        lastHeight = currentHeight;
+                    }
+                    if (stableChecks >= maxStableChecks) {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                }, 500);
+            });
+        });
 
         const calculationData = await page.evaluate(() => {
             const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files'];
@@ -66,12 +77,15 @@ app.get('/api/get-duration', async (req, res) => {
             const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
-            const includedSectionsSet = new Set();
+            // **MODIFIED**: Use an object to store video counts per section.
+            const sectionCounts = {}; 
+
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
                 courseTitle: courseTitle,
-                includedSections: [],
+                // **MODIFIED**: This will now be an array of objects.
+                sectionDetails: [],
             };
 
             const parseTime = (timeStr) => {
@@ -97,19 +111,22 @@ app.get('/api/get-duration', async (req, res) => {
                     }
                 }
 
-                if (!EXCLUDED_SECTIONS.includes(sectionName)) {
+                if (!EXCLUDED_SECTIONS.includes(sectionName) && sectionName) {
                     const timeEl = item.querySelector('time');
                     if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
-                        if (sectionName) {
-                            includedSectionsSet.add(sectionName);
-                        }
+                        // **MODIFIED**: Increment the count for this specific section.
+                        sectionCounts[sectionName] = (sectionCounts[sectionName] || 0) + 1;
                     }
                 }
             });
             
-            result.includedSections = Array.from(includedSectionsSet);
+            // **MODIFIED**: Convert the counts object into the final array of objects.
+            result.sectionDetails = Object.keys(sectionCounts).map(name => {
+                return { name: name, videoCount: sectionCounts[name] };
+            });
+
             return result;
         });
 

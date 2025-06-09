@@ -11,5 +11,8 @@
   "dependencies": {
     "express": "^4.19.2",
     "puppeteer": "^22.10.0"
+  },
+  "nodemonConfig": {
+    "ext": "js,json,hbs,html"
   }
 }

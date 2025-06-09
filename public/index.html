@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wistia Project Runtime Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,8 +37,8 @@
 
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.2);
-            width: 36px;
-            height: 36px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             border-left-color: #ffffff;
             animation: spin 1s ease infinite;
@@ -48,6 +49,14 @@
         @keyframes rotateBackground {
             from { transform: translate(-50%, -50%) rotate(0deg); }
             to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* **FIXED**: CSS for a smooth expand/collapse transition on the results container */
+        #result-container {
+            transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -61,18 +70,23 @@
 
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
             <input type="url" id="wistiaUrl" placeholder="Enter Wistia URL..." class="flex-grow bg-white/10 text-white border-2 border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 transition duration-200 placeholder-gray-400">
-            <button id="calculateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
+            <button id="calculateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center min-w-[120px]">
                 <span id="button-text">Calculate</span>
-                <div id="loader" class="hidden spinner" style="width: 24px; height: 24px; border-width: 3px;"></div>
+                <div id="loader-icon" class="hidden spinner"></div>
             </button>
         </div>
-
-        <div id="status" class="text-center min-h-[80px] flex items-center justify-center">
+        
+        <!-- This container now only holds the loader and error messages -->
+        <div class="text-center py-2">
+            <div id="loader" class="hidden spinner mx-auto"></div>
             <div id="error" class="hidden text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
-            <div id="result" class="hidden text-center">
+        </div>
+
+        <!-- The results have their own container for better animation control -->
+        <div id="result-container">
+            <div id="result-content" class="py-4 text-center">
                 <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
                 <p class="text-gray-200 text-lg">Total Runtime:</p>
-                <!-- **MODIFIED**: Reduced font size to ensure it fits on one line -->
                 <p id="totalDuration" class="text-2xl md:text-3xl font-bold text-white"></p>
                 <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
                 
@@ -89,10 +103,12 @@
     <script>
         const calculateBtn = document.getElementById('calculateBtn');
         const buttonText = document.getElementById('button-text');
+        const loaderIcon = document.getElementById('loader-icon');
         const wistiaUrlInput = document.getElementById('wistiaUrl');
         const loader = document.getElementById('loader');
         const errorDisplay = document.getElementById('error');
-        const resultDisplay = document.getElementById('result');
+        const resultContainer = document.getElementById('result-container');
+        const resultContent = document.getElementById('result-content');
         const courseTitleDisplay = document.getElementById('courseTitle');
         const totalDurationDisplay = document.getElementById('totalDuration');
         const videoCountDisplay = document.getElementById('videoCount');
@@ -106,9 +122,10 @@
         });
 
         detailsBtn.addEventListener('click', () => {
-            const isHidden = detailsContainer.classList.contains('hidden');
             detailsContainer.classList.toggle('hidden');
-            detailsBtn.textContent = isHidden ? 'Hide details' : 'View details';
+            detailsBtn.textContent = detailsContainer.classList.contains('hidden') ? 'View details' : 'Hide details';
+            // Recalculate result height when details are toggled for the animation
+            resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
         });
 
         async function handleCalculation() {
@@ -125,7 +142,7 @@
                 if (!response.ok) {
                     throw new Error(data.error || 'An unknown error occurred on the server.');
                 }
-                showResult(data.courseTitle, data.totalSeconds, data.videoCount, data.includedSections);
+                showResult(data);
             } catch (err) {
                 showError(err.message);
             } finally {
@@ -136,27 +153,17 @@
         function formatDuration(totalSeconds) {
             if (isNaN(totalSeconds)) return '0 seconds';
             if (totalSeconds === 0) return '0 seconds';
-
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = Math.floor(totalSeconds % 60);
-
             const parts = [];
-            if (hours > 0) {
-                parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
-            }
-            if (minutes > 0) {
-                parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
-            }
-            if (seconds > 0) {
-                parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
-            }
-
+            if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+            if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+            if (seconds > 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
             if (parts.length > 1) {
                 const last = parts.pop();
                 return parts.join(', ') + ', and ' + last;
             }
-
             return parts[0];
         }
 
@@ -164,44 +171,50 @@
             if (isLoading) {
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
-                loader.classList.remove('hidden');
+                loaderIcon.classList.remove('hidden');
+                resultContainer.style.maxHeight = '0';
+                resultContainer.style.opacity = '0';
                 errorDisplay.classList.add('hidden');
-                resultDisplay.classList.add('hidden');
+                loader.classList.add('hidden'); // Ensure the central loader is hidden
             } else {
                 calculateBtn.disabled = false;
                 buttonText.classList.remove('hidden');
-                loader.classList.add('hidden');
+                loaderIcon.classList.add('hidden');
             }
         }
 
         function showError(message) {
-            resultDisplay.classList.add('hidden');
             errorDisplay.textContent = message;
             errorDisplay.classList.remove('hidden');
+            loader.classList.add('hidden');
         }
         
-        function showResult(title, seconds, count, sections) {
+        function showResult(data) {
             errorDisplay.classList.add('hidden');
-            courseTitleDisplay.textContent = title;
-            totalDurationDisplay.textContent = formatDuration(seconds);
-            videoCountDisplay.textContent = `(from ${count} videos)`;
+            courseTitleDisplay.textContent = data.courseTitle;
+            totalDurationDisplay.textContent = formatDuration(data.totalSeconds);
+            videoCountDisplay.textContent = `(from ${data.videoCount} videos)`;
             
             sectionList.innerHTML = '';
-            (sections || []).forEach(section => {
+            (data.sectionDetails || []).forEach(section => {
                 const li = document.createElement('li');
-                li.textContent = section;
+                const videoText = section.videoCount > 1 ? 'videos' : 'video';
+                li.textContent = `${section.name} - ${section.videoCount} ${videoText}`;
                 sectionList.appendChild(li);
             });
 
             detailsContainer.classList.add('hidden');
             detailsBtn.textContent = 'View details';
-            resultDisplay.classList.remove('hidden');
 
-            if (sections && sections.length > 0) {
+            if (data.sectionDetails && data.sectionDetails.length > 0) {
               detailsBtn.classList.remove('hidden');
             } else {
               detailsBtn.classList.add('hidden');
             }
+
+            // Animate the result box to its full height
+            resultContainer.style.opacity = '1';
+            resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
         }
     </script>
 </body>
