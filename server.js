@@ -49,6 +49,13 @@ app.get('/api/get-duration', async (req, res) => {
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded' });
 
+        // **RE-ADDED**: Check if we were redirected to a login page.
+        const finalUrl = page.url();
+        if (finalUrl.includes('/session/new')) {
+            throw new Error('This Wistia folder is private and requires a login.');
+        }
+
+        // Use the "smart wait" logic to wait for all content to load by scrolling.
         await page.evaluate(async () => {
             await new Promise((resolve) => {
                 let lastHeight = 0;
@@ -77,14 +84,12 @@ app.get('/api/get-duration', async (req, res) => {
             const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
             const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
 
-            // **MODIFIED**: Use an object to store video counts per section.
             const sectionCounts = {}; 
 
             const result = {
                 totalSeconds: 0,
                 videoCount: 0,
                 courseTitle: courseTitle,
-                // **MODIFIED**: This will now be an array of objects.
                 sectionDetails: [],
             };
 
@@ -116,13 +121,11 @@ app.get('/api/get-duration', async (req, res) => {
                     if (timeEl) {
                         result.totalSeconds += parseTime(timeEl.textContent);
                         result.videoCount++;
-                        // **MODIFIED**: Increment the count for this specific section.
                         sectionCounts[sectionName] = (sectionCounts[sectionName] || 0) + 1;
                     }
                 }
             });
             
-            // **MODIFIED**: Convert the counts object into the final array of objects.
             result.sectionDetails = Object.keys(sectionCounts).map(name => {
                 return { name: name, videoCount: sectionCounts[name] };
             });
