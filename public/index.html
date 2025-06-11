@@ -50,19 +50,36 @@
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* CSS for the smooth expand/collapse transition */
-        .collapsible {
-            transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out, padding 0.4s ease-in-out;
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
+        /* A simple and reliable animation for content appearing */
+        .fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Simple fade-in for the modal */
+        .modal-fade-in {
+            animation: fadeInModal 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeInModal {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
 
+    <!-- Main Content Card -->
     <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-black/30 rounded-2xl shadow-2xl backdrop-blur-xl border border-gray-100/20">
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Wistia Runtime Calculator</h1>
@@ -77,70 +94,97 @@
             </button>
         </div>
         
-        <div class="text-center py-2">
+        <div class="text-center py-2 flex items-center justify-center">
             <div id="loader" class="hidden spinner mx-auto"></div>
-            <div id="error" class="collapsible text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
-            <div id="result-container" class="collapsible text-center">
-                <div id="result-content" class="py-4">
+            <div id="error" class="hidden text-red-300 bg-red-500/30 p-4 rounded-lg w-full"></div>
+            <div id="result" class="hidden text-center w-full">
+                <div class="py-4">
                     <h2 id="courseTitle" class="text-xl font-semibold text-white mb-4"></h2>
                     <p class="text-gray-200 text-lg">Total Runtime:</p>
                     <p id="totalDuration" class="text-2xl md:text-3xl font-bold text-white"></p>
                     <p id="videoCount" class="text-gray-300 text-sm mt-2"></p>
-                    
-                    <button id="detailsBtn" class="hidden mt-4 text-sm text-blue-400 hover:text-blue-300">View details</button>
-                    
-                    <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 p-4 rounded-lg transition-all duration-300">
-                        <h3 class="font-semibold mb-2">Included Sections:</h3>
-                        <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
-                    </div>
+                </div>
+                
+                <button id="detailsBtn" class="hidden text-sm text-blue-400 hover:text-blue-300">View details</button>
+                
+                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 rounded-lg p-4">
+                    <h3 class="font-semibold mb-3">Included Sections:</h3>
+                    <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-2 pl-2"></ul>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- "About" icon button and modal -->
+    <!-- **MODIFIED**: Changed rounded-full to rounded-xl -->
+    <button id="aboutBtn" class="fixed bottom-6 right-6 text-gray-400 hover:text-white transition duration-200 z-10 p-2 rounded-xl bg-black/30 backdrop-blur-md border border-white/20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    </button>
+
+    <div id="aboutModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl p-6 text-center border border-gray-700">
+            <h2 class="text-2xl font-bold mb-4">How It Works</h2>
+            <p class="text-gray-300 mb-4">
+                This tool calculates the total runtime of a public Wistia folder by remotely loading the page and adding up the durations of all the videos it finds.
+            </p>
+            <div class="bg-red-900/50 border border-red-500/50 rounded-lg p-3 text-sm">
+                <p class="font-semibold mb-2">Important Note:</p>
+                <p class="text-gray-300">The calculation automatically excludes videos from sections titled <strong class="font-semibold text-white">"0.0 Course Preview"</strong> and <strong class="font-semibold text-white">"Working Source Files"</strong> to provide a more accurate total course time.</p>
+            </div>
+            <button id="closeModalBtn" class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200">Close</button>
+        </div>
+    </div>
+
+
     <script>
+        // --- Element selectors ---
         const calculateBtn = document.getElementById('calculateBtn');
         const buttonText = document.getElementById('button-text');
         const loaderIcon = document.getElementById('loader-icon');
         const wistiaUrlInput = document.getElementById('wistiaUrl');
         const loader = document.getElementById('loader');
         const errorDisplay = document.getElementById('error');
-        const resultContainer = document.getElementById('result-container');
-        const resultContent = document.getElementById('result-content');
+        const resultDisplay = document.getElementById('result');
         const courseTitleDisplay = document.getElementById('courseTitle');
         const totalDurationDisplay = document.getElementById('totalDuration');
         const videoCountDisplay = document.getElementById('videoCount');
         const detailsBtn = document.getElementById('detailsBtn');
         const detailsContainer = document.getElementById('detailsContainer');
         const sectionList = document.getElementById('sectionList');
+        const aboutBtn = document.getElementById('aboutBtn');
+        const aboutModal = document.getElementById('aboutModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
 
+        // --- Event Listeners ---
         calculateBtn.addEventListener('click', handleCalculation);
         wistiaUrlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCalculation();
         });
 
-        // **MODIFIED**: The button now shows the details and then hides itself.
         detailsBtn.addEventListener('click', () => {
-            detailsContainer.classList.remove('hidden');
-            detailsBtn.classList.add('hidden');
-            // Recalculate result height to animate the container expansion
-            resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
+            detailsContainer.classList.toggle('hidden');
+            detailsBtn.textContent = detailsContainer.classList.contains('hidden') ? 'View details' : 'Hide details';
         });
 
+        aboutBtn.addEventListener('click', () => {
+            aboutModal.classList.remove('hidden');
+        });
+        closeModalBtn.addEventListener('click', () => {
+            aboutModal.classList.add('hidden');
+        });
+        
+        // --- Core Functions ---
         async function handleCalculation() {
             const url = wistiaUrlInput.value.trim();
-            if (!url) {
-                showError('Please enter a Wistia folder URL.');
-                return;
-            }
+            if (!url) { showError('Please enter a Wistia folder URL.'); return; }
             showLoader(true);
             try {
                 const apiUrl = `/api/get-duration?url=${encodeURIComponent(url)}`;
                 const response = await fetch(apiUrl);
                 const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'An unknown error occurred on the server.');
-                }
+                if (!response.ok) throw new Error(data.error || 'An unknown error occurred on the server.');
                 showResult(data);
             } catch (err) {
                 showError(err.message);
@@ -171,13 +215,8 @@
                 calculateBtn.disabled = true;
                 buttonText.classList.add('hidden');
                 loaderIcon.classList.remove('hidden');
-                // Collapse previous results
-                resultContainer.style.maxHeight = '0';
-                resultContainer.style.opacity = '0';
-                resultContainer.style.padding = '0';
-                errorDisplay.style.maxHeight = '0';
-                errorDisplay.style.opacity = '0';
-                errorDisplay.style.padding = '0';
+                resultDisplay.classList.add('hidden');
+                errorDisplay.classList.add('hidden');
             } else {
                 calculateBtn.disabled = false;
                 buttonText.classList.remove('hidden');
@@ -186,18 +225,13 @@
         }
 
         function showError(message) {
+            resultDisplay.classList.add('hidden');
             errorDisplay.textContent = message;
-            // Animate the error box to its full height
-            errorDisplay.style.maxHeight = errorDisplay.scrollHeight + 'px';
-            errorDisplay.style.opacity = '1';
-            errorDisplay.style.padding = '1rem';
+            errorDisplay.classList.remove('hidden');
         }
         
         function showResult(data) {
-            errorDisplay.style.maxHeight = '0';
-            errorDisplay.style.opacity = '0';
-            errorDisplay.style.padding = '0';
-
+            errorDisplay.classList.add('hidden');
             courseTitleDisplay.textContent = data.courseTitle;
             totalDurationDisplay.textContent = formatDuration(data.totalSeconds);
             videoCountDisplay.textContent = `(from ${data.videoCount} videos)`;
@@ -211,17 +245,15 @@
             });
 
             detailsContainer.classList.add('hidden');
+            detailsBtn.textContent = 'View details';
             
+            resultDisplay.classList.remove('hidden');
+
             if (data.sectionDetails && data.sectionDetails.length > 0) {
               detailsBtn.classList.remove('hidden');
             } else {
               detailsBtn.classList.add('hidden');
             }
-
-            // Animate the result box to its full height
-            resultContainer.style.opacity = '1';
-            resultContainer.style.padding = '1rem 0';
-            resultContainer.style.maxHeight = resultContent.scrollHeight + 'px';
         }
     </script>
 </body>
