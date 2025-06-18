@@ -50,7 +50,6 @@
             to { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* A simple and reliable animation for content appearing */
         .fade-in-up {
             animation: fadeInUp 0.5s ease-out forwards;
         }
@@ -66,7 +65,6 @@
             }
         }
         
-        /* Simple fade-in for the modal */
         .modal-fade-in {
             animation: fadeInModal 0.3s ease-out forwards;
         }
@@ -75,11 +73,29 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* --- Custom Scrollbar for details container --- */
+        #detailsContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #detailsContainer::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        #detailsContainer::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        #detailsContainer::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
 
-    <!-- Main Content Card -->
     <div class="w-full max-w-2xl mx-auto p-6 md:p-8 bg-black/30 rounded-2xl shadow-2xl backdrop-blur-xl border border-gray-100/20">
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Wistia Runtime Calculator</h1>
@@ -107,7 +123,7 @@
                 
                 <button id="detailsBtn" class="hidden text-sm text-blue-400 hover:text-blue-300">View details</button>
                 
-                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 rounded-lg p-4">
+                <div id="detailsContainer" class="hidden mt-4 text-left bg-white/5 rounded-lg p-4 max-h-64 overflow-y-auto">
                     <h3 class="font-semibold mb-3">Included Sections:</h3>
                     <ul id="sectionList" class="list-disc list-inside text-gray-300 text-sm space-y-2 pl-2"></ul>
                 </div>
@@ -115,7 +131,6 @@
         </div>
     </div>
 
-    <!-- "About" icon button and modal -->
     <button id="aboutBtn" class="fixed bottom-6 right-6 text-gray-400 hover:text-white transition duration-200 z-10 p-2 rounded-xl bg-black/30 backdrop-blur-md border border-white/20">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
