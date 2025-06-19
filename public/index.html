@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wistia Project Runtime Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="background.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,13 +24,13 @@
             width: 300vw;
             height: 300vh;
             transform: translate(-50%, -50%);
-            background-image: url('https://app.box.com/shared/static/blkmwh9wa10rnb85nnalpm7krgusr4y7.jpg');
+            background-image: var(--bg-image, url('https://app.box.com/shared/static/blkmwh9wa10rnb85nnalpm7krgusr4y7.jpg'));
             background-size: cover;
             background-position: center;
             opacity: 0;
             filter: blur(8px);
             animation: 
-                fadeInBackground 1.5s ease-in forwards,
+                fadeInBackground 5.5s ease-in forwards,
                 rotateBackground 50s linear infinite;
             z-index: -1;
         }
