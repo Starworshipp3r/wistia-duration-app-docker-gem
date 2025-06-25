@@ -8,7 +8,8 @@ const backgroundImages = [
     'https://app.box.com/shared/static/iwgdfrbubg9aai3o9qgsatxw3uyvra38.jpg',
     'https://app.box.com/shared/static/71uhzwdvm82n1qqcl0ebm2z2bpyncfh3.jpg',
     'https://app.box.com/shared/static/o2egtoyz541lyaj2ucn21xe1cnonvgyv.jpg',
-    'https://app.box.com/shared/static/0b6z6fplug7gm50lu6cdbjwln18qvehi.jpg'
+    'https://app.box.com/shared/static/0b6z6fplug7gm50lu6cdbjwln18qvehi.jpg',
+    'https://app.box.com/shared/static/f7nxd7kd7dolccq5kkbwnezbxtnf0pld.png'
 ];
 
 // Select a random image from the array
