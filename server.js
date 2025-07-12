@@ -57,6 +57,13 @@ app.get('/api/get-duration', async (req, res) => {
     try {
         // Get a new page from the existing browser instance.
         page = await browserInstance.newPage();
+
+        // Forward browser console messages to Node.js terminal
+        page.on('console', msg => {
+            for (let i = 0; i < msg.args().length; ++i)
+                console.log(`[browser] ${msg.args()[i]}`);
+        });
+        
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
         
         await page.goto(wistiaUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }); // Increased timeout
@@ -98,53 +105,56 @@ app.get('/api/get-duration', async (req, res) => {
             });
         });
 
-        const calculationData = await page.evaluate(() => {
-            const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump'];
-            const titleElement = document.querySelector('.TitleAndDescriptionContainer-wZVJS h1');
-            const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
-            const sectionData = {}; 
-            const result = {
-                totalSeconds: 0,
-                videoCount: 0,
-                courseTitle: courseTitle,
-                sectionDetails: [],
-            };
-            const parseTime = (timeStr) => {
-                const parts = timeStr.trim().split(':').map(Number);
-                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-                if (parts.length === 2) return parts[0] * 60 + parts[1];
-                if (parts.length === 1) return parts[0];
-                return 0;
-            };
-            const videoItems = document.querySelectorAll('div.MediaContainer-iGTxDE');
-            if (videoItems.length === 0) return null;
+const calculationData = await page.evaluate(() => {
+    const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump', 'Unedited'];
+    const titleElement = document.querySelector('h1');
+    const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
+    const sectionData = {};
+    const result = {
+        totalSeconds: 0,
+        videoCount: 0,
+        courseTitle: courseTitle,
+        sectionDetails: [],
+    };
+    const parseTime = (timeStr) => {
+        const parts = timeStr.trim().split(':').map(Number);
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        if (parts.length === 1) return parts[0];
+        return 0;
+    };
 
-            videoItems.forEach(item => {
-                const sectionContainer = item.closest('.sc-fXSgeo');
-                let sectionName = '';
-                if (sectionContainer) {
-                    const titleEl = sectionContainer.querySelector('.sc-jXbUNg.sc-bbSZdi');
-                    if (titleEl) sectionName = titleEl.textContent.trim();
-                }
-                if (!EXCLUDED_SECTIONS.includes(sectionName) && sectionName) {
-                    const timeEl = item.querySelector('time');
-                    if (timeEl) {
-                        const duration = parseTime(timeEl.textContent);
-                        result.totalSeconds += duration;
-                        result.videoCount++;
-                        if (!sectionData[sectionName]) {
-                            sectionData[sectionName] = { videoCount: 0, totalDuration: 0 };
-                        }
-                        sectionData[sectionName].videoCount++;
-                        sectionData[sectionName].totalDuration += duration;
-                    }
-                }
-            });
-            result.sectionDetails = Object.keys(sectionData).map(name => {
-                return { name: name, videoCount: sectionData[name].videoCount, totalDuration: sectionData[name].totalDuration };
-            });
-            return result;
-        });
+    const sectionHeaders = Array.from(document.querySelectorAll('.sc-JrDLc.ivdmhc'));
+sectionHeaders.forEach(sectionHeader => {
+    const sectionName = sectionHeader.textContent.trim();
+    if (EXCLUDED_SECTIONS.some(ex => sectionName.includes(ex))) return;
+
+    // Find all video nodes within this section
+    let sectionContainer = sectionHeader.parentElement;
+    const videosInSection = Array.from(sectionContainer.querySelectorAll('*')).filter(el => {
+        return el.textContent.trim().match(/^Video\s+\d{1,2}:\d{2}(:\d{2})?$/);
+    });
+
+    videosInSection.forEach(node => {
+        const timeStr = node.textContent.replace(/^Video\s+/, '').trim();
+        const duration = parseTime(timeStr);
+        result.totalSeconds += duration;
+        result.videoCount++;
+        if (!sectionData[sectionName]) {
+            sectionData[sectionName] = { videoCount: 0, totalDuration: 0 };
+        }
+        sectionData[sectionName].videoCount++;
+        sectionData[sectionName].totalDuration += duration;
+    });
+});
+
+    result.sectionDetails = Object.keys(sectionData).map(name => ({
+        name,
+        videoCount: sectionData[name].videoCount,
+        totalDuration: sectionData[name].totalDuration
+    }));
+    return result;
+});
 
         if (calculationData === null || calculationData.videoCount === 0) {
             throw new Error('Could not find any video items on the page with the expected structure.');
