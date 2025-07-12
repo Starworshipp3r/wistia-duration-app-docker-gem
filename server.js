@@ -53,6 +53,11 @@ app.get('/api/get-duration', async (req, res) => {
         return res.status(400).json({ error: 'URL query parameter is required.' });
     }
 
+    // Restrict to URLs containing 'wistia'
+    if (!wistiaUrl.toLowerCase().includes('wistia')) {
+        return res.status(400).json({ error: 'Only Wistia URLs are allowed.' });
+    }
+
     let page = null;
     try {
         // Get a new page from the existing browser instance.
