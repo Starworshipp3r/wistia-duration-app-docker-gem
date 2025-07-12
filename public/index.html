@@ -28,7 +28,7 @@
             background-size: cover;
             background-position: center;
             opacity: 0;
-            filter: blur(10px);
+            filter: blur(8px);
             animation: 
                 fadeInBackground 5.5s ease-in forwards,
                 rotateBackground 50s linear infinite;
@@ -198,6 +198,10 @@
         async function handleCalculation() {
             const url = wistiaUrlInput.value.trim();
             if (!url) { showError('Please enter a Wistia folder URL.'); return; }
+            if (!url.toLowerCase().includes('wistia')) {
+                showError('Only Wistia URLs are allowed.');
+                return;
+            }
             showLoader(true);
             try {
                 const apiUrl = `/api/get-duration?url=${encodeURIComponent(url)}`;
