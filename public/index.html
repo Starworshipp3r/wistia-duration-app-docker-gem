@@ -10,6 +10,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        #totalDuration {
+            cursor: pointer;
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
             background-color: #003991;
@@ -93,6 +97,15 @@
         #detailsContainer::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+
+        #copiedFlyout {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #copiedFlyout.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
@@ -156,6 +169,10 @@
         </div>
     </div>
 
+    <div id="copiedFlyout" class="fixed top-8 left-1/2 transform -translate-x-1/2 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-lg opacity-0 pointer-events-none transition duration-300 z-50 text-lg font-semibold" style="font-family: 'Inter', sans-serif;">
+        Copied to clipboard!
+    </div>
+
 
     <script>
         // --- Element selectors ---
@@ -175,6 +192,7 @@
         const aboutBtn = document.getElementById('aboutBtn');
         const aboutModal = document.getElementById('aboutModal');
         const closeModalBtn = document.getElementById('closeModalBtn');
+        const copiedFlyout = document.getElementById('copiedFlyout');
 
         // --- Event Listeners ---
         calculateBtn.addEventListener('click', handleCalculation);
@@ -192,6 +210,14 @@
         });
         closeModalBtn.addEventListener('click', () => {
             aboutModal.classList.add('hidden');
+        });
+        
+        totalDurationDisplay.addEventListener('click', () => {
+            const text = totalDurationDisplay.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                copiedFlyout.classList.add('show');
+                setTimeout(() => copiedFlyout.classList.remove('show'), 1200);
+            });
         });
         
         // --- Core Functions ---
@@ -283,6 +309,15 @@
             } else {
               detailsBtn.classList.add('hidden');
             }
+        }
+
+        function showCopiedFlyout() {
+            copiedFlyout.classList.remove('opacity-0', 'pointer-events-none');
+            copiedFlyout.classList.add('opacity-100', 'pointer-events-auto');
+            setTimeout(() => {
+                copiedFlyout.classList.remove('opacity-100', 'pointer-events-auto');
+                copiedFlyout.classList.add('opacity-0', 'pointer-events-none');
+            }, 2000);
         }
     </script>
 </body>
