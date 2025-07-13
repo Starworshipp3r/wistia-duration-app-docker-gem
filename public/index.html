@@ -99,9 +99,11 @@
         }
 
         #copiedFlyout {
+            position: absolute;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
+            z-index: 100;
         }
         #copiedFlyout.show {
             opacity: 1;
@@ -212,9 +214,17 @@
             aboutModal.classList.add('hidden');
         });
         
-        totalDurationDisplay.addEventListener('click', () => {
+        totalDurationDisplay.addEventListener('click', (e) => {
             const text = totalDurationDisplay.textContent;
             navigator.clipboard.writeText(text).then(() => {
+                // Get click coordinates relative to the viewport
+                const x = e.clientX;
+                const y = e.clientY;
+
+                // Position the flyout near the click
+                copiedFlyout.style.left = `${x}px`;
+                copiedFlyout.style.top = `${y}px`;
+
                 copiedFlyout.classList.add('show');
                 setTimeout(() => copiedFlyout.classList.remove('show'), 1200);
             });
