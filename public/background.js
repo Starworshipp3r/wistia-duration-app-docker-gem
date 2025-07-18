@@ -17,7 +17,9 @@ const backgroundImages = [
     'https://app.box.com/shared/static/aep44eb8bnqa9vqyllevm7obs2xlqsc4.jpg',
     'https://app.box.com/shared/static/oube9wseecewlchjjpunja8k39l7xd3i.jpg',
     'https://app.box.com/shared/static/q6p7kamd5a580sgm1plcls4m5iuqzpch.jpg',
-    'https://app.box.com/shared/static/o7n7gc4duqhtgca5ni4o43umg7ha3zut.jpg'
+    'https://app.box.com/shared/static/o7n7gc4duqhtgca5ni4o43umg7ha3zut.jpg',
+    'https://app.box.com/shared/static/jmdp4lw6p8m6bo0tty6e2636m6xojfyf.png',
+    'https://app.box.com/shared/static/etx44rb2r0y0ibpsqvn6s1djcycrrwl6.png'
 ];
 
 // Select a random image from the array
