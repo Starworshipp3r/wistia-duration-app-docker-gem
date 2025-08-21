@@ -110,6 +110,83 @@ app.get('/api/get-duration', async (req, res) => {
             });
         });
 
+        // Aggressively reveal any "SHOW MORE" / "VIEW MORE" items (scroll + dispatch real mouse events)
+        await page.evaluate(async () => {
+
+            function isVisible(el) {
+                return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+            }
+
+            function findShowMoreCandidates() {
+                const nodes = Array.from(document.querySelectorAll('button, a, span, div'));
+                return nodes.filter(el => {
+                    if (!el || !el.textContent) return false;
+                    const txt = el.textContent.replace(/\s+/g, ' ').trim();
+                    if (!txt) return false;
+                    const low = txt.toLowerCase();
+                    // Match exact or contained phrases, tolerant to case/whitespace
+                    if (low === 'show more' || low === 'view more') return true;
+                    if (/\bshow more\b/.test(low) || /\bview more\b/.test(low)) return true;
+                    return false;
+                }).filter(isVisible);
+            }
+
+            function findRemainingNodes() {
+                const nodes = Array.from(document.querySelectorAll('*'));
+                return nodes.filter(el => {
+                    if (!el || !el.textContent) return false;
+                    return /remaining/i.test(el.textContent) && isVisible(el);
+                });
+            }
+
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+            let attempts = 0;
+            const maxAttempts = 40;
+            while (attempts < maxAttempts) {
+                // Scroll to bottom to trigger lazy loading
+                window.scrollTo(0, document.body.scrollHeight);
+                await sleep(400);
+
+                const buttons = findShowMoreCandidates();
+                if (buttons.length === 0) {
+                    // fallback: try "remaining" nodes that sometimes are clickable
+                    const rem = findRemainingNodes();
+                    if (rem.length === 0) break;
+                    for (const el of rem) {
+                        try {
+                            el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            await sleep(500);
+                        } catch (e) { /* ignore and continue */ }
+                    }
+                    attempts++;
+                    continue;
+                }
+
+                // Click each found button/link/span/div
+                for (const btn of buttons) {
+                    try {
+                        btn.scrollIntoView({ behavior: 'auto', block: 'center' });
+                        // Use a real mouse event to trigger framework handlers
+                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        // extra click just in case
+                        await sleep(300);
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+
+                // wait for any newly loaded items to render
+                await sleep(600);
+                attempts++;
+            }
+
+            // final small scroll to ensure any newly revealed videos load
+            window.scrollTo(0, document.body.scrollHeight);
+            await sleep(500);
+        });
+
 const calculationData = await page.evaluate(() => {
     const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump', 'Unedited', 'Holding Pen'];
     const titleElement = document.querySelector('h1');
