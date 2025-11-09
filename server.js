@@ -188,7 +188,7 @@ app.get('/api/get-duration', async (req, res) => {
         });
 
 const calculationData = await page.evaluate(() => {
-    const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump', 'Unedited', 'Holding Pen'];
+    const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump', 'Unedited', 'Holding Pen', 'Archive Videos', 'Archive'];
     const titleElement = document.querySelector('h1');
     const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
     const sectionData = {};
