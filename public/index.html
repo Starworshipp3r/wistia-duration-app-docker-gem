@@ -10,32 +10,58 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-base: #071a3d;
+            --bg-primary: #145da0;
+            --bg-secondary: #2e8bc0;
+            --bg-accent: #b1f0ff;
+            --bg-glow: rgba(177, 240, 255, 0.28);
+        }
+
         #totalDuration {
             cursor: pointer;
         }
         
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #003991;
+            background:
+                radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 38%),
+                linear-gradient(135deg, var(--bg-base), #040814 70%);
+            position: relative;
+            isolation: isolate;
             overflow: hidden;
         }
 
-        body::before {
+        body::before,
+        body::after {
             content: '';
             position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 300vw;
-            height: 300vh;
-            transform: translate(-50%, -50%);
-            background-image: var(--bg-image, url('https://app.box.com/shared/static/blkmwh9wa10rnb85nnalpm7krgusr4y7.jpg'));
-            background-size: cover;
-            background-position: center;
+            inset: -35vmax;
+            pointer-events: none;
+        }
+
+        body::before {
+            background:
+                radial-gradient(circle at 18% 22%, var(--bg-accent) 0%, transparent 28%),
+                radial-gradient(circle at 78% 24%, var(--bg-primary) 0%, transparent 34%),
+                radial-gradient(circle at 52% 82%, var(--bg-secondary) 0%, transparent 36%),
+                conic-gradient(from 180deg at 50% 50%, var(--bg-base), var(--bg-primary), var(--bg-secondary), var(--bg-base));
             opacity: 0;
-            filter: blur(8px);
-            animation: 
-                fadeInBackground 5.5s ease-in forwards,
-                rotateBackground 50s linear infinite;
+            filter: blur(70px) saturate(135%);
+            animation:
+                fadeInBackground 2.8s ease-out forwards,
+                orbitBackground 60s ease-in-out infinite alternate;
+            z-index: -2;
+        }
+
+        body::after {
+            background:
+                radial-gradient(circle at 30% 70%, var(--bg-glow) 0%, transparent 24%),
+                radial-gradient(circle at 72% 36%, rgba(255, 255, 255, 0.16) 0%, transparent 18%),
+                linear-gradient(125deg, transparent 20%, rgba(255, 255, 255, 0.06) 50%, transparent 80%);
+            opacity: 0.45;
+            filter: blur(40px);
+            animation: shimmerBackground 85s ease-in-out infinite alternate;
             z-index: -1;
         }
 
@@ -50,9 +76,15 @@
         
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes fadeInBackground { to { opacity: 1; } }
-        @keyframes rotateBackground {
-            from { transform: translate(-50%, -50%) rotate(0deg); }
-            to { transform: translate(-50%, -50%) rotate(360deg); }
+        @keyframes orbitBackground {
+            0% { transform: translate3d(-3%, -2%, 0) scale(1.02) rotate(0deg); }
+            50% { transform: translate3d(3%, 4%, 0) scale(1.12) rotate(180deg); }
+            100% { transform: translate3d(-2%, -4%, 0) scale(1.08) rotate(360deg); }
+        }
+        @keyframes shimmerBackground {
+            0% { transform: translate3d(2%, -2%, 0) scale(1) rotate(0deg); }
+            50% { transform: translate3d(-3%, 2%, 0) scale(1.08) rotate(-160deg); }
+            100% { transform: translate3d(1%, -1%, 0) scale(1.03) rotate(-320deg); }
         }
 
         .fade-in-up {
