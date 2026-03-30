@@ -206,7 +206,7 @@ const calculationData = await page.evaluate(() => {
         return 0;
     };
 
-    const sectionHeaders = Array.from(document.querySelectorAll('.sc-fhfEft.dFEJoJ'));
+    const sectionHeaders = Array.from(document.querySelectorAll('.sc-jMAIzW.iQnVjH'));
 sectionHeaders.forEach(sectionHeader => {
     const sectionName = sectionHeader.textContent.trim();
     if (EXCLUDED_SECTIONS.some(ex => sectionName.includes(ex))) return;
