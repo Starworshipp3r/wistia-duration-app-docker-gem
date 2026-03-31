@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 
-// **PERFORMANCE OPTIMIZATION**: We will launch the browser once when the server starts,
+// **PERFORMANCE OPTIMIZATION**: Launch the browser once when the server starts,
 // and then reuse this single browser instance for all incoming requests. This is much faster.
 let browserInstance;
 
