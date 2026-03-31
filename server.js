@@ -187,56 +187,277 @@ app.get('/api/get-duration', async (req, res) => {
             await sleep(500);
         });
 
-const calculationData = await page.evaluate(() => {
-    const EXCLUDED_SECTIONS = ['0.0 Course Preview', 'Working Source Files', 'Editing Dump', 'Unedited', 'Holding Pen', 'Archive Videos', 'Archive'];
-    const titleElement = document.querySelector('h1');
-    const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
-    const sectionData = {};
-    const result = {
-        totalSeconds: 0,
-        videoCount: 0,
-        courseTitle: courseTitle,
-        sectionDetails: [],
-    };
-    const parseTime = (timeStr) => {
-        const parts = timeStr.trim().split(':').map(Number);
-        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        if (parts.length === 2) return parts[0] * 60 + parts[1];
-        if (parts.length === 1) return parts[0];
-        return 0;
-    };
+        const calculationData = await page.evaluate(() => {
+            const EXCLUDED_SECTIONS = ['Course Preview', 'Working Source Files', 'Working Source Folders', 'Editing Dump', 'Unedited', 'Holding Pen', 'Archive Videos', 'Archive'];
+            const titleElement = document.querySelector('h1');
+            const courseTitle = titleElement ? titleElement.textContent.trim() : 'Unknown Course';
+            const sectionData = {};
+            const result = {
+                totalSeconds: 0,
+                videoCount: 0,
+                courseTitle,
+                sectionDetails: [],
+            };
+            const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"], strong, b, div, span, p';
+            const DURATION_NODE_SELECTOR = 'span, div, p, a, button, li, time';
+            const exactVideoDurationPattern = /^Video\s+(\d{1,2}:\d{2}(?::\d{2})?)$/i;
+            const bareDurationPattern = /^(\d{1,2}:\d{2}(?::\d{2})?)$/;
+            const durationCache = new WeakMap();
+            const headingCandidatesCache = new WeakMap();
+            const excludedHeadingCandidatesCache = new WeakMap();
+            const sectionNameCache = new WeakMap();
 
-    const sectionHeaders = Array.from(document.querySelectorAll('.sc-jMAIzW.iQnVjH'));
-sectionHeaders.forEach(sectionHeader => {
-    const sectionName = sectionHeader.textContent.trim();
-    if (EXCLUDED_SECTIONS.some(ex => sectionName.includes(ex))) return;
+            const normalizeText = (value = '') => value.replace(/\s+/g, ' ').trim();
+            const isVisible = (el) => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+            const isExcludedSectionName = (value = '') => {
+                const normalizedValue = normalizeText(value).toLowerCase();
+                return EXCLUDED_SECTIONS.some((excludedSection) => normalizedValue.includes(excludedSection.toLowerCase()));
+            };
+            const parseTime = (timeStr) => {
+                const parts = timeStr.trim().split(':').map(Number);
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 1) return parts[0];
+                return 0;
+            };
+            const extractDurationText = (text, allowBareDurations = true) => {
+                const normalized = normalizeText(text);
+                const exactMatch = normalized.match(exactVideoDurationPattern);
+                if (exactMatch) return exactMatch[1];
+                if (!allowBareDurations) return null;
 
-    // Find all video nodes within this section
-    let sectionContainer = sectionHeader.parentElement;
-    const videosInSection = Array.from(sectionContainer.querySelectorAll('*')).filter(el => {
-        return el.textContent.trim().match(/^Video\s+\d{1,2}:\d{2}(:\d{2})?$/);
-    });
+                const bareMatch = normalized.match(bareDurationPattern);
+                return bareMatch ? bareMatch[1] : null;
+            };
+            const compareDocumentOrder = (a, b) => {
+                if (a === b) return 0;
+                return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+            };
+            const hasMatchingChild = (el, allowBareDurations) => {
+                return Array.from(el.children).some((child) => Boolean(extractDurationText(child.textContent, allowBareDurations)));
+            };
+            const collectDurationNodes = () => {
+                const candidates = Array.from(document.querySelectorAll(DURATION_NODE_SELECTOR)).filter((el) => isVisible(el));
+                const exactMatches = candidates.filter((el) => Boolean(extractDurationText(el.textContent, false)) && !hasMatchingChild(el, false));
+                if (exactMatches.length > 0) {
+                    return exactMatches.sort(compareDocumentOrder);
+                }
 
-    videosInSection.forEach(node => {
-        const timeStr = node.textContent.replace(/^Video\s+/, '').trim();
-        const duration = parseTime(timeStr);
-        result.totalSeconds += duration;
-        result.videoCount++;
-        if (!sectionData[sectionName]) {
-            sectionData[sectionName] = { videoCount: 0, totalDuration: 0 };
-        }
-        sectionData[sectionName].videoCount++;
-        sectionData[sectionName].totalDuration += duration;
-    });
-});
+                return candidates
+                    .filter((el) => {
+                        const text = normalizeText(el.textContent);
+                        return text.length <= 8 && Boolean(extractDurationText(text, true)) && !hasMatchingChild(el, true);
+                    })
+                    .sort(compareDocumentOrder);
+            };
 
-    result.sectionDetails = Object.keys(sectionData).map(name => ({
-        name,
-        videoCount: sectionData[name].videoCount,
-        totalDuration: sectionData[name].totalDuration
-    }));
-    return result;
-});
+            const durationNodes = collectDurationNodes();
+            const getContainedDurations = (container) => {
+                if (!container) return [];
+                if (durationCache.has(container)) return durationCache.get(container);
+
+                const durations = durationNodes.filter((durationNode) => container.contains(durationNode));
+                durationCache.set(container, durations);
+                return durations;
+            };
+            const findVideoContainer = (durationNode, stopContainer) => {
+                let current = durationNode;
+
+                while (current.parentElement && current.parentElement !== stopContainer) {
+                    current = current.parentElement;
+                }
+
+                return current;
+            };
+            const isHeadingCandidate = (element, firstDurationNode, firstVideoContainer, sectionContainer) => {
+                if (!element || !isVisible(element)) return false;
+
+                const text = normalizeText(element.textContent);
+                if (!text || text === courseTitle || text.length > 120) return false;
+                if (extractDurationText(text, true)) return false;
+                if (element.children.length > 10) return false;
+                if (element.contains(firstDurationNode)) return false;
+                if (firstVideoContainer && firstVideoContainer.contains(element)) return false;
+                if (!(element.compareDocumentPosition(firstDurationNode) & Node.DOCUMENT_POSITION_FOLLOWING)) return false;
+                if (getContainedDurations(element).length > 0) return false;
+
+                const lowerText = text.toLowerCase();
+                if (/\bshow more\b|\bview more\b|\bremaining\b/.test(lowerText)) return false;
+                if (/^\d+\s+videos?$/i.test(text) || /^\d+\s+lessons?$/i.test(text)) return false;
+                if (Array.from(element.children).some((child) => normalizeText(child.textContent) === text)) return false;
+
+                const directChildOfSection = element.parentElement === sectionContainer;
+                const grandchildOfSection = element.parentElement && element.parentElement.parentElement === sectionContainer;
+                const looksStructural = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(element.tagName)
+                    || element.getAttribute('role') === 'heading'
+                    || directChildOfSection
+                    || grandchildOfSection;
+
+                if (!looksStructural) {
+                    const fontWeight = Number.parseInt(window.getComputedStyle(element).fontWeight, 10);
+                    if (Number.isNaN(fontWeight) || fontWeight < 600) {
+                        return false;
+                    }
+                }
+
+                return true;
+            };
+            const getHeadingScore = (element, sectionContainer) => {
+                const text = normalizeText(element.textContent);
+                let score = 0;
+
+                if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(element.tagName)) score += 6;
+                if (element.getAttribute('role') === 'heading') score += 6;
+                if (element.parentElement === sectionContainer) score += 3;
+                if (/^\d+(\.\d+)*\s+/.test(text)) score += 3;
+                if (/\b(section|module|chapter|lesson|week)\b/i.test(text)) score += 2;
+                if (text.length <= 80) score += 1;
+
+                const fontWeight = Number.parseInt(window.getComputedStyle(element).fontWeight, 10);
+                if (!Number.isNaN(fontWeight) && fontWeight >= 600) score += 2;
+
+                return score;
+            };
+            const getSectionHeadingCandidates = (sectionContainer) => {
+                if (!sectionContainer) return [];
+                if (headingCandidatesCache.has(sectionContainer)) return headingCandidatesCache.get(sectionContainer);
+
+                const containedDurations = getContainedDurations(sectionContainer);
+                if (containedDurations.length === 0) {
+                    headingCandidatesCache.set(sectionContainer, []);
+                    return [];
+                }
+
+                const firstDurationNode = containedDurations[0];
+                const firstVideoContainer = findVideoContainer(firstDurationNode, sectionContainer);
+                const candidates = Array.from(sectionContainer.querySelectorAll(HEADING_SELECTOR))
+                    .filter((element) => isHeadingCandidate(element, firstDurationNode, firstVideoContainer, sectionContainer))
+                    .map((element) => ({
+                        name: normalizeText(element.textContent),
+                        score: getHeadingScore(element, sectionContainer),
+                    }))
+                    .sort((a, b) => b.score - a.score || a.name.length - b.name.length);
+
+                headingCandidatesCache.set(sectionContainer, candidates);
+                return candidates;
+            };
+            const getExcludedSectionHeadingCandidates = (sectionContainer) => {
+                if (!sectionContainer) return [];
+                if (excludedHeadingCandidatesCache.has(sectionContainer)) return excludedHeadingCandidatesCache.get(sectionContainer);
+
+                const containedDurations = getContainedDurations(sectionContainer);
+                if (containedDurations.length === 0) {
+                    excludedHeadingCandidatesCache.set(sectionContainer, []);
+                    return [];
+                }
+
+                const firstDurationNode = containedDurations[0];
+                const firstVideoContainer = findVideoContainer(firstDurationNode, sectionContainer);
+                const candidates = Array.from(sectionContainer.querySelectorAll(HEADING_SELECTOR))
+                    .filter((element) => {
+                        if (!element || !isVisible(element)) return false;
+
+                        const text = normalizeText(element.textContent);
+                        if (!text || !isExcludedSectionName(text)) return false;
+                        if (element.contains(firstDurationNode)) return false;
+                        if (firstVideoContainer && firstVideoContainer.contains(element)) return false;
+                        if (!(element.compareDocumentPosition(firstDurationNode) & Node.DOCUMENT_POSITION_FOLLOWING)) return false;
+                        if (getContainedDurations(element).length > 0) return false;
+
+                        return true;
+                    })
+                    .map((element) => ({
+                        name: normalizeText(element.textContent),
+                        score: getHeadingScore(element, sectionContainer),
+                    }))
+                    .sort((a, b) => b.score - a.score || a.name.length - b.name.length);
+
+                excludedHeadingCandidatesCache.set(sectionContainer, candidates);
+                return candidates;
+            };
+            const findSectionContainer = (durationNode) => {
+                let current = durationNode.parentElement;
+                let multiDurationFallback = null;
+                let singleDurationFallback = null;
+
+                while (current && current !== document.body) {
+                    const containedDurations = getContainedDurations(current);
+                    if (containedDurations.length === 0) {
+                        current = current.parentElement;
+                        continue;
+                    }
+
+                    const firstVideoContainer = findVideoContainer(containedDurations[0], current);
+                    const isOnlyVideoCard = containedDurations.length === 1 && current === firstVideoContainer;
+                    const hasExcludedHeadingCandidates = getExcludedSectionHeadingCandidates(current).length > 0;
+                    const hasHeadingCandidates = getSectionHeadingCandidates(current).length > 0;
+
+                    if (hasExcludedHeadingCandidates) {
+                        return current;
+                    }
+
+                    if (containedDurations.length > 1) {
+                        if (!multiDurationFallback) {
+                            multiDurationFallback = current;
+                        }
+                        if (hasHeadingCandidates) {
+                            return current;
+                        }
+                    }
+                    else if (!isOnlyVideoCard && hasHeadingCandidates) {
+                        singleDurationFallback = current;
+                    }
+
+                    current = current.parentElement;
+                }
+
+                return singleDurationFallback || multiDurationFallback;
+            };
+            const deriveSectionName = (durationNode) => {
+                const sectionContainer = findSectionContainer(durationNode);
+                if (!sectionContainer) return 'Uncategorized';
+                if (sectionNameCache.has(sectionContainer)) return sectionNameCache.get(sectionContainer);
+
+                const excludedCandidates = getExcludedSectionHeadingCandidates(sectionContainer);
+                if (excludedCandidates[0]) {
+                    sectionNameCache.set(sectionContainer, excludedCandidates[0].name);
+                    return excludedCandidates[0].name;
+                }
+
+                const candidates = getSectionHeadingCandidates(sectionContainer);
+                const sectionName = candidates[0] ? candidates[0].name : 'Uncategorized';
+                sectionNameCache.set(sectionContainer, sectionName);
+                return sectionName;
+            };
+
+            durationNodes.forEach((durationNode) => {
+                const timeText = extractDurationText(durationNode.textContent, true);
+                const duration = timeText ? parseTime(timeText) : 0;
+                const sectionName = deriveSectionName(durationNode);
+
+                if (!duration || isExcludedSectionName(sectionName)) {
+                    return;
+                }
+
+                result.totalSeconds += duration;
+                result.videoCount++;
+
+                if (!sectionData[sectionName]) {
+                    sectionData[sectionName] = { videoCount: 0, totalDuration: 0 };
+                }
+
+                sectionData[sectionName].videoCount++;
+                sectionData[sectionName].totalDuration += duration;
+            });
+
+            result.sectionDetails = Object.keys(sectionData).map((name) => ({
+                name,
+                videoCount: sectionData[name].videoCount,
+                totalDuration: sectionData[name].totalDuration,
+            }));
+
+            return result;
+        });
 
         if (calculationData === null || calculationData.videoCount === 0) {
             throw new Error('Could not find any video items on the page with the expected structure.');
