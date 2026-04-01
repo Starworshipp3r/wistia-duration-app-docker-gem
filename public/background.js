@@ -52,6 +52,51 @@ const backgroundPalettes = [
         tertiary: '#f0a35e',
         accent: '#ffe0d6',
         highlight: '#fff2c6'
+    },
+    {
+        base: '#10252a',
+        baseDeep: '#041015',
+        primary: '#1d6f73',
+        secondary: '#33b5a5',
+        tertiary: '#7ed957',
+        accent: '#dcfff0',
+        highlight: '#f5ffd8'
+    },
+    {
+        base: '#24152f',
+        baseDeep: '#0c0611',
+        primary: '#6c3fa4',
+        secondary: '#b256d8',
+        tertiary: '#ff8d5c',
+        accent: '#ffe3ea',
+        highlight: '#fff3d8'
+    },
+    {
+        base: '#182236',
+        baseDeep: '#060c18',
+        primary: '#3e63dd',
+        secondary: '#27b1bf',
+        tertiary: '#f0c25e',
+        accent: '#ffecc8',
+        highlight: '#fff8dc'
+    },
+    {
+        base: '#1f1d18',
+        baseDeep: '#090806',
+        primary: '#6e5a2b',
+        secondary: '#b59a52',
+        tertiary: '#7abf9a',
+        accent: '#f5e7c8',
+        highlight: '#fbf7df'
+    },
+    {
+        base: '#29141a',
+        baseDeep: '#10070a',
+        primary: '#8e3756',
+        secondary: '#d0616b',
+        tertiary: '#f1a86a',
+        accent: '#ffe0cf',
+        highlight: '#fff2e5'
     }
 ];
 
